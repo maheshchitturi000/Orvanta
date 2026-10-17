@@ -46,6 +46,10 @@ export class VerifyEmail implements OnInit {
       | null;
     this.infoMessage.set(state?.message ?? `Enter the 6-digit code we sent to ${email}.`);
     this.startCooldown(state?.resendAfterSeconds ?? 60);
+    if (state?.resendAfterSeconds === 0) {
+      this.errorMessage.set(this.infoMessage());
+      this.infoMessage.set(`Request a new code for ${email}.`);
+    }
     this.destroyRef.onDestroy(() => this.stopTimer());
   }
 

@@ -102,6 +102,15 @@ export class Register {
       });
     } catch (error) {
       const apiError = ApiError.from(error);
+      const created = apiError.statusObject as { email?: string } | null;
+
+      // Account created but the email failed: continue to verification so the user can resend.
+      if (apiError.statusCode === 502 && created?.email) {
+        this.auth.setPendingVerification(created.email);
+        await this.router.navigate(['/verify-email'], { state: { message: apiError.message, resendAfterSeconds: 0 } });
+        return;
+      }
+
       if (!applyServerErrors(this.form, apiError.fieldErrors)) {
         this.errorMessage.set(apiError.message);
       }

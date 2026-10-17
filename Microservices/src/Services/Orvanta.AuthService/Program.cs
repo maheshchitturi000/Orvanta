@@ -7,6 +7,7 @@ using Orvanta.AuthService.Services;
 using Orvanta.Shared.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddOrvantaLogging("auth-service");
 
 builder.Services.AddOrvantaControllers();
 builder.Services.AddOrvantaJwtAuthentication(builder.Configuration);
@@ -43,6 +44,19 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 
 var app = builder.Build();
 
+// Say loudly how verification emails will be delivered, so "I got no email" is easy to diagnose.
+var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Orvanta.AuthService.Startup");
+if (smtp.IsConfigured)
+{
+    startupLog.LogInformation("Email delivery: SMTP {Host}:{Port} (SSL {Ssl}) as {From} using account {User}",
+        smtp.Host, smtp.Port, smtp.EnableSsl, smtp.FromEmail, string.IsNullOrEmpty(smtp.UserName) ? "(none)" : smtp.UserName);
+}
+else
+{
+    startupLog.LogWarning("Email delivery: DISABLED - Smtp:Host is not set. Verification codes are written to this log " +
+                          "instead of being emailed. Configure Smtp:* in user-secrets to send real emails.");
+}
+
 if (app.Environment.IsDevelopment())
 {
     // Development convenience. For production, generate EF Core migrations
@@ -52,6 +66,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseForwardedHeaders();
+app.UseOrvantaRequestLogging();
 app.UseOrvantaExceptionHandling();
 app.UseAuthentication();
 app.UseAuthorization();

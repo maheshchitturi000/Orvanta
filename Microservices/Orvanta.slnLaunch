@@ -1,0 +1,27 @@
+[
+  {
+    "Name": "Orvanta (all services)",
+    "Projects": [
+      {
+        "Path": "src\\Services\\Orvanta.AuthService\\Orvanta.AuthService.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "src\\Services\\Orvanta.FoodService\\Orvanta.FoodService.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "src\\Services\\Orvanta.AIService\\Orvanta.AIService.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "src\\Services\\Orvanta.ConversationService\\Orvanta.ConversationService.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "src\\Gateway\\Orvanta.Gateway\\Orvanta.Gateway.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

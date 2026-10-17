@@ -3,6 +3,7 @@ using Orvanta.Shared.Extensions;
 using Orvanta.Shared.Responses;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddOrvantaLogging("gateway");
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 
@@ -34,6 +35,7 @@ builder.Services.AddReverseProxy()
 
 var app = builder.Build();
 
+app.UseOrvantaRequestLogging();
 app.UseOrvantaExceptionHandling();
 app.UseCors("frontend");
 app.UseRateLimiter();

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Orvanta.AuthService.Contracts;
 using Orvanta.AuthService.Data;
 using Orvanta.AuthService.Domain;
+using Orvanta.AuthService.Notifications;
 using Orvanta.AuthService.Security;
 using Orvanta.Shared.Responses;
 using Orvanta.Shared.Security;
@@ -71,12 +72,18 @@ public sealed class AuthService(
         user.TermsAcceptedAtUtc = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
-        await otpService.IssueAndSendAsync(user, ct);
-
         logger.LogInformation("Registration started for user {UserId}", user.Id);
 
-        return ServiceResult<RegisterResult>.Created(
-            new RegisterResult(user.Id, user.Email, _security.OtpExpiryMinutes * 60, _security.OtpResendCooldownSeconds),
+        var result = new RegisterResult(user.Id, user.Email, _security.OtpExpiryMinutes * 60, _security.OtpResendCooldownSeconds);
+
+        if (!await TrySendOtpAsync(user, ct))
+        {
+            // The account exists; the person can use "Resend code" once email delivery works.
+            return ServiceResult<RegisterResult>.Fail(502,
+                "Your account was created, but we couldn't send the verification email. Please use \"Resend code\" in a moment.", result);
+        }
+
+        return ServiceResult<RegisterResult>.Created(result,
             "We've sent a 6-digit code to your email. Enter it to activate your account.");
     }
 
@@ -132,8 +139,9 @@ public sealed class AuthService(
             return ServiceResult<OtpSentResult>.Fail(429, $"Please wait {wait} seconds before requesting another code.");
         }
 
-        await otpService.IssueAndSendAsync(user, ct);
-        return ServiceResult<OtpSentResult>.Ok(result, "A new code has been sent to your email.");
+        return await TrySendOtpAsync(user, ct)
+            ? ServiceResult<OtpSentResult>.Ok(result, "A new code has been sent to your email.")
+            : ServiceResult<OtpSentResult>.Fail(502, "We couldn't send the email right now. Please try again in a minute.");
     }
 
     public async Task<ServiceResult<IssuedSession>> LoginAsync(LoginRequest request, ClientInfo client, CancellationToken ct)
@@ -174,7 +182,7 @@ public sealed class AuthService(
         {
             if (await otpService.GetResendWaitSecondsAsync(user.Id, ct) == 0)
             {
-                await otpService.IssueAndSendAsync(user, ct);
+                await TrySendOtpAsync(user, ct);
             }
 
             return ServiceResult<IssuedSession>.Fail(403, "Please verify your email first. We've sent you a code.");
@@ -254,6 +262,21 @@ public sealed class AuthService(
         return user is null
             ? ServiceResult<UserProfile>.Fail(404, "Account not found.")
             : ServiceResult<UserProfile>.Ok(ToProfile(user));
+    }
+
+    /// <summary>Issues and emails an OTP. Delivery failures are already logged with the SMTP reason by the sender.</summary>
+    private async Task<bool> TrySendOtpAsync(User user, CancellationToken ct)
+    {
+        try
+        {
+            await otpService.IssueAndSendAsync(user, ct);
+            return true;
+        }
+        catch (EmailDeliveryException)
+        {
+            logger.LogWarning("Verification email for user {UserId} was not delivered", user.Id);
+            return false;
+        }
     }
 
     private IssuedSession IssueSession(User user, Guid familyId, ClientInfo client)

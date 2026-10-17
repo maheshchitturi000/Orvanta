@@ -10,6 +10,7 @@ using Orvanta.Shared.Extensions;
 using Orvanta.Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddOrvantaLogging("food-service");
 
 builder.Services.AddOrvantaControllers();
 builder.Services.AddOrvantaJwtAuthentication(builder.Configuration);
@@ -57,6 +58,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseForwardedHeaders();
+app.UseOrvantaRequestLogging();
 app.UseOrvantaExceptionHandling();
 app.UseAuthentication();
 app.UseAuthorization();
