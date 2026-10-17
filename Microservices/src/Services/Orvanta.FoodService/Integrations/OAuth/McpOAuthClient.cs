@@ -108,6 +108,31 @@ public sealed class McpOAuthClient(
         return (clientId, clientSecret);
     }
 
+    /// <summary>Best-effort revocation of the provider session. Returns false if the provider refused or is unreachable.</summary>
+    public async Task<bool> RevokeSessionAsync(string provider, ProviderSettings settings, string accessToken, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(settings.LogoutPath))
+        {
+            return false;
+        }
+
+        var url = $"{settings.AuthServerUrl.TrimEnd('/')}/{settings.LogoutPath.TrimStart('/')}";
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(new { }) };
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+            using var response = await httpClientFactory.CreateClient("oauth").SendAsync(request, ct);
+            logger.LogInformation("Revoked {Provider} session: HTTP {Status}", provider, (int)response.StatusCode);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            logger.LogWarning(ex, "Could not revoke {Provider} session", provider);
+            return false;
+        }
+    }
+
     public static (string Verifier, string Challenge) CreatePkce()
     {
         var verifier = SecureHash.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));

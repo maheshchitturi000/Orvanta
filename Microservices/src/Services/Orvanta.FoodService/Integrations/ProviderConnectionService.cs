@@ -167,6 +167,15 @@ public sealed class ProviderConnectionService(
     public async Task DisconnectAsync(Guid userId, string provider, CancellationToken ct)
     {
         provider = provider.ToLowerInvariant();
+
+        // End the session at the provider too; otherwise its consent page silently reuses the same account.
+        var connection = await db.ProviderConnections.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.UserId == userId && c.Provider == provider, ct);
+        if (connection is not null && Settings(provider) is { } settings)
+        {
+            await oauth.RevokeSessionAsync(provider, settings, protector.Unprotect(connection.AccessTokenEncrypted), ct);
+        }
+
         await db.ProviderConnections.Where(c => c.UserId == userId && c.Provider == provider).ExecuteDeleteAsync(ct);
         await db.SavedAddresses.Where(a => a.UserId == userId && a.Provider == provider).ExecuteDeleteAsync(ct);
     }

@@ -34,6 +34,12 @@ public sealed class ProviderSettings
     /// <summary>Optional pre-registered client id. When empty, Dynamic Client Registration (RFC 7591) is used.</summary>
     public string ClientId { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Optional path on the auth server that revokes the provider session (Swiggy: /auth/logout).
+    /// Called on disconnect so the next connect asks the user to sign in again.
+    /// </summary>
+    public string LogoutPath { get; set; } = string.Empty;
+
     /// <summary>"json" (Swiggy) or "form" (RFC 6749 default) for the token endpoint body.</summary>
     public string TokenRequestFormat { get; set; } = "form";
 
