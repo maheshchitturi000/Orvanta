@@ -11,6 +11,14 @@
         "Action": "Start"
       },
       {
+        "Path": "src\\Services\\Jobs\\Orvanta.JobsService\\Orvanta.JobsService.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "src\\Services\\Jobs\\Orvanta.Jobs.Functions\\Orvanta.Jobs.Functions.csproj",
+        "Action": "Start"
+      },
+      {
         "Path": "src\\Services\\Orvanta.AIService\\Orvanta.AIService.csproj",
         "Action": "Start"
       },

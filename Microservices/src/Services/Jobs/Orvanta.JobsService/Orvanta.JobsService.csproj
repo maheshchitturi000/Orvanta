@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orvanta.Jobs.Core\Orvanta.Jobs.Core.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Orvanta.Shared\Orvanta.Shared.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>b66171d3-8c42-46e6-8d0c-c37d8a4e16f5</UserSecretsId>
+  </PropertyGroup>
+
+</Project>

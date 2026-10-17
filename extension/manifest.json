@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Orvanta AI – Job Apply Assistant",
+  "description": "Fills the job applications you approved in Orvanta. You review and press Submit.",
+  "version": "1.0.0",
+  "action": {
+    "default_title": "Orvanta",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["storage", "tabs", "activeTab", "scripting"],
+  "host_permissions": [
+    "http://localhost:5095/*",
+    "https://job-boards.greenhouse.io/*",
+    "https://boards.greenhouse.io/*",
+    "https://jobs.lever.co/*",
+    "https://jobs.ashbyhq.com/*",
+    "https://www.linkedin.com/jobs/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://job-boards.greenhouse.io/*",
+        "https://boards.greenhouse.io/*",
+        "https://jobs.lever.co/*",
+        "https://jobs.ashbyhq.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  }
+}

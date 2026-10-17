@@ -1,0 +1,214 @@
+@if (message(); as m) {
+  <div class="alert" [class.success]="m.kind === 'success'" [class.error]="m.kind === 'error'" role="status">
+    <app-icon [name]="m.kind === 'success' ? 'check' : 'alert'" [size]="16" /> {{ m.text }}
+  </div>
+}
+
+<!-- CV upload -->
+<section class="card section">
+  <header class="section-head">
+    <span class="section-icon"><app-icon name="file" [size]="18" /></span>
+    <div>
+      <h2>Your CV</h2>
+      <p>PDF, DOCX or TXT up to 5 MB. Orvanta reads your skills and experience to score jobs.</p>
+    </div>
+  </header>
+
+  <label class="drop" [class.dragging]="dragging()" [class.busy]="uploading()"
+         (dragover)="$event.preventDefault(); dragging.set(true)" (dragleave)="dragging.set(false)" (drop)="onDrop($event)">
+    <input type="file" class="sr-only" [accept]="accept" (change)="onFileChosen($event)" [disabled]="uploading()" />
+    @if (uploading()) {
+      <span class="spinner"></span>
+      <strong>Reading your CV…</strong>
+      <small>Extracting skills and experience</small>
+    } @else if (profile()?.hasCv) {
+      <app-icon name="file" [size]="24" />
+      <strong>{{ profile()?.cvFileName }}</strong>
+      <small>Updated {{ profile()?.updatedAtUtc | date: 'MMM d, y' }} · Drop a new file or click to replace</small>
+    } @else {
+      <app-icon name="upload" [size]="24" />
+      <strong>Drop your CV here or click to browse</strong>
+      <small>We'll pre-fill your profile from it</small>
+    }
+  </label>
+</section>
+
+@if (profile(); as p) {
+  <!-- Profile -->
+  <section class="card section">
+    <header class="section-head">
+      <span class="section-icon"><app-icon name="user" [size]="18" /></span>
+      <div>
+        <h2>Profile</h2>
+        <p>Used to score jobs and to fill application forms. Check it carefully.</p>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="field">
+        <label for="fullName">Full name</label>
+        <input id="fullName" class="input" [ngModel]="p.fullName" (ngModelChange)="patchProfile('fullName', $event)" />
+      </div>
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" class="input" type="email" [ngModel]="p.email" (ngModelChange)="patchProfile('email', $event)" />
+      </div>
+      <div class="field">
+        <label for="phone">Phone</label>
+        <input id="phone" class="input" [ngModel]="p.phone" (ngModelChange)="patchProfile('phone', $event)" />
+      </div>
+      <div class="field">
+        <label for="location">Current location</label>
+        <input id="location" class="input" placeholder="e.g. Chennai, India" [ngModel]="p.location" (ngModelChange)="patchProfile('location', $event)" />
+      </div>
+      <div class="field">
+        <label for="title">Current title</label>
+        <input id="title" class="input" placeholder="e.g. Senior .NET Developer" [ngModel]="p.currentTitle" (ngModelChange)="patchProfile('currentTitle', $event)" />
+      </div>
+      <div class="field">
+        <label for="years">Years of experience</label>
+        <input id="years" class="input" type="number" min="0" max="50" step="0.5" [ngModel]="p.totalYearsExperience" (ngModelChange)="patchProfile('totalYearsExperience', +$event)" />
+      </div>
+      <div class="field">
+        <label for="linkedin">LinkedIn URL</label>
+        <input id="linkedin" class="input" placeholder="https://linkedin.com/in/you" [ngModel]="p.linkedInUrl" (ngModelChange)="patchProfile('linkedInUrl', $event)" />
+      </div>
+      <div class="field">
+        <label for="portfolio">Portfolio / GitHub</label>
+        <input id="portfolio" class="input" placeholder="https://github.com/you" [ngModel]="p.portfolioUrl" (ngModelChange)="patchProfile('portfolioUrl', $event)" />
+      </div>
+      <div class="field full">
+        <label for="skills">Skills</label>
+        <app-chip-input inputId="skills" label="Add skill" placeholder="Add a skill and press Enter" [values]="p.skills" (valuesChange)="patchProfile('skills', $event)" />
+      </div>
+      <div class="field full">
+        <label for="summary">Summary</label>
+        <textarea id="summary" class="input textarea" rows="3" [ngModel]="p.summary" (ngModelChange)="patchProfile('summary', $event)"></textarea>
+      </div>
+    </div>
+
+    <footer class="section-foot">
+      <button type="button" class="btn btn-primary" (click)="saveProfile()" [disabled]="savingProfile()">
+        @if (savingProfile()) { <span class="spinner"></span> Saving… } @else { Save profile }
+      </button>
+    </footer>
+  </section>
+}
+
+@if (preferences(); as pr) {
+  <!-- Preferences -->
+  <section class="card section">
+    <header class="section-head">
+      <span class="section-icon"><app-icon name="globe" [size]="18" /></span>
+      <div>
+        <h2>What you're looking for</h2>
+        <p>Orvanta only lists jobs that pass these filters and score at least your minimum match.</p>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="field full">
+        <label for="titles">Target roles</label>
+        <app-chip-input inputId="titles" label="Add role" placeholder="e.g. .NET Developer, Software Engineer"
+                        [values]="pr.desiredTitles" (valuesChange)="patchPrefs('desiredTitles', $event)" />
+      </div>
+      <div class="field full">
+        <label for="locations">Locations (any country)</label>
+        <app-chip-input inputId="locations" label="Add location" placeholder="e.g. Bengaluru, London, Germany — leave empty for anywhere"
+                        [values]="pr.locations" (valuesChange)="patchPrefs('locations', $event)" />
+      </div>
+
+      <label class="toggle">
+        <input type="checkbox" [ngModel]="pr.includeRemote" (ngModelChange)="patchPrefs('includeRemote', $event)" />
+        <span><strong>Include remote jobs</strong><small>Remote roles anywhere count as a location match</small></span>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" [ngModel]="pr.remoteOnly" (ngModelChange)="patchPrefs('remoteOnly', $event)" />
+        <span><strong>Remote only</strong><small>Ignore on-site and hybrid roles</small></span>
+      </label>
+
+      <div class="field">
+        <label for="minScore">Minimum match: <strong>{{ pr.minMatchScore }}%</strong></label>
+        <input id="minScore" type="range" min="50" max="100" step="5" class="range" [ngModel]="pr.minMatchScore" (ngModelChange)="patchPrefs('minMatchScore', +$event)" />
+      </div>
+      <div class="field">
+        <label for="age">Only jobs posted in the last</label>
+        <select id="age" class="input" [ngModel]="pr.maxPostingAgeDays" (ngModelChange)="patchPrefs('maxPostingAgeDays', +$event)">
+          <option [ngValue]="7">7 days</option>
+          <option [ngValue]="14">14 days</option>
+          <option [ngValue]="30">30 days</option>
+          <option [ngValue]="60">60 days</option>
+        </select>
+      </div>
+
+      <div class="field full">
+        <label for="boards">Company career boards</label>
+        <app-chip-input inputId="boards" label="Add board" placeholder="provider:company, e.g. greenhouse:stripe"
+                        [values]="pr.companyBoards" [suggestions]="suggestedBoards()" (valuesChange)="patchPrefs('companyBoards', $event)" />
+        <span class="hint">Supported: greenhouse, lever, ashby. The company name is the last part of its careers URL (e.g. boards.greenhouse.io/<b>stripe</b>).</span>
+      </div>
+      <div class="field full">
+        <label for="excluded">Exclude companies</label>
+        <app-chip-input inputId="excluded" label="Exclude company" placeholder="e.g. your current employer"
+                        [values]="pr.excludedCompanies" (valuesChange)="patchPrefs('excludedCompanies', $event)" />
+      </div>
+    </div>
+
+    <h3 class="subhead">Application answers</h3>
+    <div class="grid">
+      <div class="field">
+        <label for="notice">Notice period (days)</label>
+        <input id="notice" class="input" type="number" min="0" max="365" [ngModel]="pr.noticePeriodDays" (ngModelChange)="patchPrefs('noticePeriodDays', +$event)" />
+      </div>
+      <div class="field">
+        <label for="salary">Expected salary</label>
+        <input id="salary" class="input" placeholder="e.g. ₹30 LPA or £70,000" [ngModel]="pr.expectedSalary" (ngModelChange)="patchPrefs('expectedSalary', $event)" />
+      </div>
+      <div class="field full">
+        <label for="auth">Work authorization</label>
+        <input id="auth" class="input" placeholder="e.g. Indian citizen; no UK work visa" [ngModel]="pr.workAuthorization" (ngModelChange)="patchPrefs('workAuthorization', $event)" />
+      </div>
+      <label class="toggle">
+        <input type="checkbox" [ngModel]="pr.needsVisaSponsorship" (ngModelChange)="patchPrefs('needsVisaSponsorship', $event)" />
+        <span><strong>I need visa sponsorship</strong><small>For roles outside your current country</small></span>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" [ngModel]="pr.willingToRelocate" (ngModelChange)="patchPrefs('willingToRelocate', $event)" />
+        <span><strong>Willing to relocate</strong></span>
+      </label>
+    </div>
+
+    <h3 class="subhead">Daily automation</h3>
+    <div class="grid">
+      <label class="toggle full">
+        <input type="checkbox" [ngModel]="pr.dailyAutomationEnabled" (ngModelChange)="patchPrefs('dailyAutomationEnabled', $event)" />
+        <span><strong>Search for new jobs every day</strong><small>Runs in the background; you approve the matches</small></span>
+      </label>
+      <div class="field">
+        <label for="hour">Run at</label>
+        <select id="hour" class="input" [ngModel]="pr.dailyRunHourLocal" (ngModelChange)="patchPrefs('dailyRunHourLocal', +$event)" [disabled]="!pr.dailyAutomationEnabled">
+          @for (h of hours; track h) {
+            <option [ngValue]="h">{{ hourLabel(h) }}</option>
+          }
+        </select>
+      </div>
+      <div class="field">
+        <label for="tz">Time zone</label>
+        <select id="tz" class="input" [ngModel]="pr.timeZoneId" (ngModelChange)="patchPrefs('timeZoneId', $event)" [disabled]="!pr.dailyAutomationEnabled">
+          @for (tz of timeZones; track tz) {
+            <option [value]="tz">{{ tz }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <footer class="section-foot">
+      @if (pr.lastDiscoverySummary) {
+        <small class="hint">Last run: {{ pr.lastDiscoverySummary }}</small>
+      }
+      <button type="button" class="btn btn-primary" (click)="savePreferences()" [disabled]="savingPrefs()">
+        @if (savingPrefs()) { <span class="spinner"></span> Saving… } @else { Save preferences }
+      </button>
+    </footer>
+  </section>
+}

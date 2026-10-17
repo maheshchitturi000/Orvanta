@@ -33,6 +33,7 @@ public sealed class AuthService(
     ILogger<AuthService> logger) : IAuthService
 {
     private const string InvalidCredentials = "Incorrect email or password.";
+    private static readonly TimeSpan RefreshReuseGrace = TimeSpan.FromSeconds(30);
 
     // Hash of a random password, used to keep response timing constant for unknown emails.
     private static string? _dummyHash;
@@ -220,7 +221,13 @@ public sealed class AuthService(
             return ServiceResult<IssuedSession>.Fail(401, "Please sign in.");
         }
 
-        if (stored.RevokedAtUtc is not null)
+        // Two clients sharing the cookie (web app + Chrome extension) may refresh at the same moment.
+        // A token rotated within the grace window is accepted once more instead of being treated as theft.
+        var withinGrace = stored.RevokedAtUtc is not null
+                          && stored.ReplacedByTokenHash is not null
+                          && now - stored.RevokedAtUtc.Value <= RefreshReuseGrace;
+
+        if (stored.RevokedAtUtc is not null && !withinGrace)
         {
             // A rotated token was presented again: assume theft and end the whole session family.
             await RevokeFamilyAsync(stored.FamilyId, ct);
@@ -234,8 +241,11 @@ public sealed class AuthService(
         }
 
         var issued = IssueSession(stored.User, stored.FamilyId, client);
-        stored.RevokedAtUtc = now;
-        stored.ReplacedByTokenHash = SecureHash.Sha256(issued.RefreshToken);
+        if (!withinGrace)
+        {
+            stored.RevokedAtUtc = now;
+            stored.ReplacedByTokenHash = SecureHash.Sha256(issued.RefreshToken);
+        }
         await db.SaveChangesAsync(ct);
 
         return ServiceResult<IssuedSession>.Ok(issued, "Session refreshed.");

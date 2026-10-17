@@ -35,6 +35,44 @@ FoodService runs on **5077** because `http://localhost:5077/api/integrations/swi
 redirect URI already working with Swiggy's `swiggy-mcp` client. The OAuth callback goes straight to
 FoodService; every other call goes through the Gateway.
 
+## Jobs: CV-matched auto-apply
+
+```
+Angular  ──► Gateway /api/jobs/* ──► JobsService :5081 ──► SQL (OrvantaJobs)
+                                         │  approve / run discovery
+                                         ▼
+                              Azure Storage Queues (Azurite locally)
+                                 job-discovery │ job-apply
+                                         ▼
+                     Orvanta.Jobs.Functions (Azure Functions, .NET isolated)
+   Scheduler (hourly timer) → DiscoveryWorker → ApplyWorker → ApplyPoisonHandler
+                                         ▼
+          Chrome extension fills each prepared application in the user's browser → user submits
+```
+
+| Project | Role |
+|---|---|
+| `Orvanta.Jobs.Core` | Shared domain: EF model, career-board sources (Greenhouse, Lever, Ashby), CV parsing, `JobMatcher`, workflows, queue client |
+| `Orvanta.JobsService` | REST API: CV upload, profile, preferences, matches, one-click approval, applications |
+| `Orvanta.Jobs.Functions` | Background workflow. **Scheduler** runs hourly and starts each user's daily search at *their* local hour (any time zone), and re-queues stuck items. **DiscoveryWorker** fetches boards, filters, scores and stores matches of 80% or more. **ApplyWorker** writes the cover letter and form answers and marks the application ready. Messages that fail 5 times go to a poison queue and are marked Failed |
+| `extension/` (repo root) | Chrome extension that fills approved applications; the user presses Submit |
+
+**Match score (0–100)** comes from `JobMatcher` and is explainable: 55% skills (job skills found in the
+CV, with implied skills, so SQL Server counts as SQL), 30% role (job title vs target roles, with
+synonyms), and 15% seniority (required years vs CV). Guards: a different job function (manager, sales,
+solutions…) or a core skill in the title missing from the CV keeps a job below 80.
+
+**AI is optional.** With Ollama running (`Jobs:Llm`), CVs are parsed and cover letters written by the
+local model. Without it, rule-based parsing and a template letter are used, so nothing breaks.
+
+**Why the extension, not a server bot:** LinkedIn and most job sites forbid automated submission, and
+server-side bots get user accounts restricted. Orvanta automates discovery, matching and preparation in
+the cloud; the final Submit happens in the user's own browser.
+
+Run locally: Azurite + `func start` in `src/Services/Jobs/Orvanta.Jobs.Functions` (Core Tools **4.x
+recent**; the copy bundled with older Visual Studio installs is too old), plus `JobsService`.
+`run-all.ps1` starts all of them.
+
 ## Common response contract
 
 Every endpoint returns `ResponseCls<T>` (`Orvanta.Shared/Responses/ResponseCls.cs`):

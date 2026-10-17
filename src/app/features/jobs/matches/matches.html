@@ -1,0 +1,114 @@
+@if (needsCv()) {
+  <div class="empty">
+    <span class="empty-icon"><app-icon name="file" [size]="22" /></span>
+    <h3>Start with your CV</h3>
+    <p>Upload your CV and tell Orvanta which roles you want. It then searches career boards every day and lists jobs that match at least 80%.</p>
+    <a class="btn btn-primary" routerLink="../profile"><app-icon name="upload" [size]="16" /> Upload CV</a>
+  </div>
+} @else {
+  <div class="toolbar">
+    <label class="select-all">
+      <input type="checkbox" [checked]="allSelected()" (change)="toggleAll()" [disabled]="!matches().length || busy()" />
+      <span>{{ selected().size ? selected().size + ' selected' : 'Select all' }}</span>
+    </label>
+
+    <div class="actions">
+      <button type="button" class="btn btn-outline btn-sm" (click)="searchNow()" [disabled]="searching() || busy()">
+        @if (searching()) { <span class="spinner"></span> Searching… } @else { <app-icon name="refresh" [size]="15" /> Search now }
+      </button>
+      @if (selected().size > 0 && !allSelected()) {
+        <button type="button" class="btn btn-outline btn-sm" (click)="approve(false)" [disabled]="busy()">
+          Approve {{ selected().size }}
+        </button>
+      }
+      <button type="button" class="btn btn-primary btn-sm" (click)="approve(true)" [disabled]="busy() || !matches().length">
+        @if (busy()) { <span class="spinner"></span> } @else { <app-icon name="check" [size]="15" /> }
+        Approve all ({{ matches().length }})
+      </button>
+    </div>
+  </div>
+
+  @if (notice()) {
+    <div class="alert success" role="status"><app-icon name="check" [size]="16" /> {{ notice() }}</div>
+  }
+  @if (error()) {
+    <div class="alert error" role="alert"><app-icon name="alert" [size]="16" /> {{ error() }}</div>
+  }
+
+  @if (loading() && !matches().length) {
+    @for (i of [1, 2, 3]; track i) {
+      <div class="card skeleton"></div>
+    }
+  } @else if (!matches().length) {
+    <div class="empty">
+      <span class="empty-icon"><app-icon name="search" [size]="22" /></span>
+      <h3>No new matches right now</h3>
+      <p>
+        Orvanta searches every day at your chosen time.
+        @if (state.summary()?.lastDiscoverySummary) {
+          <br /><small>Last run: {{ state.summary()?.lastDiscoverySummary }}</small>
+        }
+      </p>
+      <button type="button" class="btn btn-outline" (click)="searchNow()" [disabled]="searching()">
+        @if (searching()) { <span class="spinner"></span> Searching… } @else { Search now }
+      </button>
+    </div>
+  } @else {
+    <ul class="list">
+      @for (m of matches(); track m.id) {
+        <li class="card match" [class.selected]="selected().has(m.id)">
+          <div class="row">
+            <input type="checkbox" class="pick" [checked]="selected().has(m.id)" (change)="toggle(m.id)"
+                   [attr.aria-label]="'Select ' + m.job.title" />
+
+            <div [class]="'score ' + scoreClass(m.score)" [attr.aria-label]="m.score + '% match'">
+              <strong>{{ m.score }}</strong><small>%</small>
+            </div>
+
+            <div class="info">
+              <h3>{{ m.job.title }}</h3>
+              <div class="meta">
+                <span class="company">{{ m.job.company }}</span>
+                <span><app-icon name="mapPin" [size]="13" /> {{ m.job.location || 'Location not listed' }}</span>
+                @if (m.job.isRemote) { <span class="badge success">Remote</span> }
+                @if (m.job.postedAtUtc) { <span class="muted">Posted {{ m.job.postedAtUtc | date: 'MMM d' }}</span> }
+              </div>
+
+              <div class="skills">
+                @for (s of m.matchedSkills.slice(0, 8); track s) {
+                  <span class="chip have"><app-icon name="check" [size]="11" [strokeWidth]="3" /> {{ s }}</span>
+                }
+                @for (s of m.missingSkills.slice(0, 4); track s) {
+                  <span class="chip missing">{{ s }}</span>
+                }
+              </div>
+            </div>
+
+            <div class="side">
+              <a class="btn btn-ghost btn-sm" [href]="m.job.url" target="_blank" rel="noopener">
+                View <app-icon name="external" [size]="13" />
+              </a>
+              <button type="button" class="btn btn-ghost btn-sm" (click)="toggleDetails(m.id)" [attr.aria-expanded]="expanded() === m.id">
+                Why?
+              </button>
+              <button type="button" class="btn btn-danger-ghost btn-sm" (click)="skip(m)" [disabled]="busy()">Skip</button>
+            </div>
+          </div>
+
+          @if (expanded() === m.id) {
+            <ul class="reasons">
+              @for (r of m.reasons; track r) {
+                <li>{{ r }}</li>
+              }
+            </ul>
+          }
+        </li>
+      }
+    </ul>
+
+    <p class="hint">
+      <app-icon name="shield" [size]="14" />
+      Approved jobs are prepared in the background (cover letter + form answers). The Orvanta Chrome extension then fills each form in your own browser so you can submit safely.
+    </p>
+  }
+}

@@ -9,6 +9,12 @@ const assistant: PageMeta = {
   icon: 'sparkles'
 };
 
+const jobs: PageMeta = {
+  title: 'Jobs',
+  subtitle: 'Daily matches from company career boards · approve once, Orvanta prepares every application',
+  icon: 'briefcase'
+};
+
 const integrations: PageMeta = {
   title: 'Integrations',
   subtitle: 'Connect the apps Orvanta can use on your behalf',
@@ -54,6 +60,32 @@ export const routes: Routes = [
         title: 'Conversation · Orvanta AI',
         data: assistant,
         loadComponent: () => import('./features/chat/chat').then(m => m.Chat)
+      },
+      {
+        path: 'jobs',
+        data: jobs,
+        loadComponent: () => import('./features/jobs/jobs-layout/jobs-layout').then(m => m.JobsLayout),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'matches' },
+          {
+            path: 'matches',
+            title: 'Job matches · Orvanta AI',
+            data: jobs,
+            loadComponent: () => import('./features/jobs/matches/matches').then(m => m.Matches)
+          },
+          {
+            path: 'applications',
+            title: 'Applications · Orvanta AI',
+            data: jobs,
+            loadComponent: () => import('./features/jobs/applications/applications').then(m => m.Applications)
+          },
+          {
+            path: 'profile',
+            title: 'CV & preferences · Orvanta AI',
+            data: jobs,
+            loadComponent: () => import('./features/jobs/profile/job-profile').then(m => m.JobProfile)
+          }
+        ]
       },
       {
         path: 'integrations',

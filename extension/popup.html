@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Orvanta</title>
+  <style>
+    body { width: 300px; margin: 0; padding: 16px; font: 14px/1.45 Inter, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1d1636; background: #fff; }
+    header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: linear-gradient(135deg, #8b6cff, #6343e0); color: #fff; font-weight: 700; }
+    .name { font-weight: 700; font-size: 16px; } .name span { color: #7c5cff; }
+    .card { padding: 12px; border: 1px solid #ece8f8; border-radius: 12px; background: #fcfbff; margin-bottom: 12px; }
+    .big { font-size: 26px; font-weight: 700; color: #4b30b0; }
+    small { color: #6e6790; }
+    button { width: 100%; height: 38px; margin-top: 8px; border: 1px solid #e2dbff; border-radius: 10px; background: #fff; color: #6343e0; font: 600 13.5px inherit; cursor: pointer; }
+    button.primary { background: #7c5cff; border-color: #7c5cff; color: #fff; }
+    button:disabled { opacity: .5; cursor: default; }
+    .error { color: #d93a4a; font-size: 13px; }
+    a { color: #6343e0; }
+  </style>
+</head>
+<body>
+  <header><span class="mark">O</span><span class="name">orvanta<span>.ai</span></span></header>
+  <div id="content"><small>Loading…</small></div>
+  <script src="popup.js"></script>
+</body>
+</html>

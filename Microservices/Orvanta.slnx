@@ -14,6 +14,11 @@
     <Project Path="src/Services/Orvanta.IntegrationService/Orvanta.IntegrationService.csproj" />
     <Project Path="src/Services/Orvanta.VoiceService/Orvanta.VoiceService.csproj" />
   </Folder>
+  <Folder Name="/src/Services/Jobs/">
+    <Project Path="src/Services/Jobs/Orvanta.Jobs.Core/Orvanta.Jobs.Core.csproj" />
+    <Project Path="src/Services/Jobs/Orvanta.Jobs.Functions/Orvanta.Jobs.Functions.csproj" />
+    <Project Path="src/Services/Jobs/Orvanta.JobsService/Orvanta.JobsService.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Orvanta.UnitTests/Orvanta.UnitTests.csproj" />
   </Folder>

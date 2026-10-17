@@ -48,6 +48,7 @@ export class Sidebar implements OnInit {
 
   protected readonly nav: NavItem[] = [
     { label: 'AI Assistant', icon: 'sparkles', link: '/', matches: ['/c/'] },
+    { label: 'Jobs', icon: 'briefcase', link: '/jobs', matches: ['/jobs/'] },
     { label: 'Integrations', icon: 'apps', link: '/integrations' }
   ];
 

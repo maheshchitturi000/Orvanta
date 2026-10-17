@@ -1,0 +1,58 @@
+#orvanta-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(720px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border: 1px solid #e2dbff;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(99, 67, 224, 0.22);
+  font: 14px/1.45 Inter, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #1d1636;
+}
+
+#orvanta-banner .orv-brand {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #8b6cff, #6343e0);
+  color: #fff;
+  font-weight: 700;
+}
+
+#orvanta-banner .orv-text {
+  flex: 1;
+  min-width: 0;
+}
+
+#orvanta-banner .orv-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+#orvanta-banner button {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #e2dbff;
+  border-radius: 10px;
+  background: #fff;
+  color: #6343e0;
+  font: 600 13px Inter, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  cursor: pointer;
+}
+
+#orvanta-banner button.orv-primary {
+  background: #7c5cff;
+  border-color: #7c5cff;
+  color: #fff;
+}

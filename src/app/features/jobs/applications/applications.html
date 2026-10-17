@@ -1,0 +1,75 @@
+<div class="filters" role="tablist" aria-label="Filter applications">
+  @for (f of filters; track f.key) {
+    <button type="button" class="filter" role="tab" [class.active]="filter() === f.key" [attr.aria-selected]="filter() === f.key"
+            (click)="filter.set(f.key)">
+      {{ f.label }}
+    </button>
+  }
+</div>
+
+@if (error()) {
+  <div class="alert error" role="alert"><app-icon name="alert" [size]="16" /> {{ error() }}</div>
+}
+
+@if (loading()) {
+  @for (i of [1, 2]; track i) {
+    <div class="card skeleton"></div>
+  }
+} @else if (!visible().length) {
+  <div class="empty">
+    <span class="empty-icon"><app-icon name="send" [size]="22" /></span>
+    <h3>No applications here yet</h3>
+    <p>Approve matches and Orvanta prepares each application in the background.</p>
+  </div>
+} @else {
+  <ul class="list">
+    @for (a of visible(); track a.id) {
+      <li class="card app">
+        <div class="row">
+          <div class="info">
+            <h3>{{ a.job.title }}</h3>
+            <div class="meta">
+              <span class="company">{{ a.job.company }}</span>
+              <span>{{ a.job.location }}</span>
+              <span class="muted">Approved {{ a.approvedAtUtc | date: 'MMM d, h:mm a' }}</span>
+            </div>
+            @if (a.status === 'Failed' && a.error) {
+              <p class="error-text">{{ a.error }}</p>
+            }
+          </div>
+
+          <span class="status" [attr.data-status]="a.status">
+            @if (a.status === 'Queued' || a.status === 'Preparing') { <span class="spinner"></span> }
+            {{ label(a.status) }}
+          </span>
+
+          <div class="side">
+            @if (a.status === 'ReadyToSubmit') {
+              <a class="btn btn-primary btn-sm" [href]="a.job.applyUrl" target="_blank" rel="noopener">
+                Open & submit <app-icon name="external" [size]="13" />
+              </a>
+              <button type="button" class="btn btn-ghost btn-sm" (click)="markSubmitted(a)">Mark applied</button>
+            }
+            @if (a.coverLetter) {
+              <button type="button" class="btn btn-ghost btn-sm" (click)="toggle(a.id)" [attr.aria-expanded]="open() === a.id">
+                {{ open() === a.id ? 'Hide' : 'Cover letter' }}
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (open() === a.id) {
+          <div class="letter">
+            <div class="letter-head">
+              <strong>Cover letter</strong>
+              <button type="button" class="btn btn-outline btn-sm" (click)="copy(a)">
+                {{ copied() === a.id ? 'Copied ✓' : 'Copy' }}
+              </button>
+            </div>
+            <pre>{{ a.coverLetter }}</pre>
+          </div>
+        }
+      </li>
+    }
+  </ul>
+}

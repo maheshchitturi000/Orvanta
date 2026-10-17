@@ -1,0 +1,50 @@
+<div class="page">
+  @if (state.summary(); as s) {
+    <section class="stats" aria-label="Job automation summary">
+      <div class="stat">
+        <span class="stat-icon"><app-icon name="search" [size]="16" /></span>
+        <div><strong>{{ s.newMatches }}</strong><small>New matches</small></div>
+      </div>
+      <div class="stat">
+        <span class="stat-icon"><app-icon name="clock" [size]="16" /></span>
+        <div><strong>{{ s.queued }}</strong><small>Preparing</small></div>
+      </div>
+      <div class="stat">
+        <span class="stat-icon"><app-icon name="send" [size]="16" /></span>
+        <div><strong>{{ s.readyToSubmit }}</strong><small>Ready to submit</small></div>
+      </div>
+      <div class="stat">
+        <span class="stat-icon ok"><app-icon name="check" [size]="16" /></span>
+        <div><strong>{{ s.submitted }}</strong><small>Applied</small></div>
+      </div>
+
+      <div class="automation" [class.off]="!s.dailyAutomationEnabled">
+        <span class="dot"></span>
+        <div>
+          <strong>Daily search {{ s.dailyAutomationEnabled ? 'on' : 'off' }}</strong>
+          <small>
+            @if (s.lastDiscoveryAtUtc) {
+              Last run {{ s.lastDiscoveryAtUtc | date: 'MMM d, h:mm a' }}
+            } @else {
+              Not run yet
+            }
+          </small>
+        </div>
+      </div>
+    </section>
+  }
+
+  <nav class="tabs" aria-label="Jobs sections">
+    @for (tab of tabs; track tab.link) {
+      <a class="tab" [routerLink]="tab.link" routerLinkActive="active">
+        <app-icon [name]="tab.icon" [size]="16" />
+        {{ tab.label }}
+        @if (tab.badge && tab.badge() > 0) {
+          <span class="badge">{{ tab.badge() }}</span>
+        }
+      </a>
+    }
+  </nav>
+
+  <router-outlet />
+</div>

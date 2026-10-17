@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Services\Orvanta.AuthService\Orvanta.AuthService.csproj" />
     <ProjectReference Include="..\..\src\Services\Orvanta.FoodService\Orvanta.FoodService.csproj" />
+    <ProjectReference Include="..\..\src\Services\Jobs\Orvanta.Jobs.Core\Orvanta.Jobs.Core.csproj" />
   </ItemGroup>
 
 </Project>

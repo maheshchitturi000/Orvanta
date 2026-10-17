@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "Jobs__QueueConnectionString": "UseDevelopmentStorage=true",
+    "Jobs__DefaultMatchThreshold": "80",
+    "Jobs__MaxNewMatchesPerRun": "40",
+    "Jobs__Llm__Provider": "ollama",
+    "Jobs__Llm__BaseUrl": "http://localhost:11434/",
+    "Jobs__Llm__Model": "qwen3:4b",
+    "Jobs__Llm__TimeoutSeconds": "120"
+  },
+  "ConnectionStrings": {
+    "JobsDb": "Server=localhost\\SQLEXPRESS;Database=OrvantaJobs;Trusted_Connection=True;TrustServerCertificate=True"
+  }
+}
