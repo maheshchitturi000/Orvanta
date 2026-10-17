@@ -26,12 +26,28 @@ public sealed class AzureStorageJobQueue(IOptions<JobsOptions> options) : IJobQu
 
     private async Task SendAsync<T>(string queueName, T message, CancellationToken ct)
     {
-        var client = await _clients.GetOrAdd(queueName, name => new Lazy<Task<QueueClient>>(async () =>
+        var lazy = _clients.GetOrAdd(queueName, name => new Lazy<Task<QueueClient>>(async () =>
         {
-            var queue = new QueueClient(_connectionString, name, new QueueClientOptions { MessageEncoding = QueueMessageEncoding.Base64 });
+            var queueOptions = new QueueClientOptions { MessageEncoding = QueueMessageEncoding.Base64 };
+            // Fail fast when storage is unreachable; callers fall back instead of hanging the request.
+            queueOptions.Retry.MaxRetries = 1;
+            queueOptions.Retry.NetworkTimeout = TimeSpan.FromSeconds(5);
+            var queue = new QueueClient(_connectionString, name, queueOptions);
             await queue.CreateIfNotExistsAsync(cancellationToken: CancellationToken.None);
             return queue;
-        })).Value;
+        }));
+
+        QueueClient client;
+        try
+        {
+            client = await lazy.Value;
+        }
+        catch
+        {
+            // Don't cache a failed initialisation (storage may come up later).
+            _clients.TryRemove(queueName, out _);
+            throw;
+        }
 
         await client.SendMessageAsync(JsonSerializer.Serialize(message), ct);
     }

@@ -12,7 +12,12 @@ using Orvanta.Shared.Responses;
 namespace Orvanta.JobsService.Services;
 
 /// <summary>Matches, one-click approval, applications and the hand-off to the background workflow.</summary>
-public sealed class MatchService(JobsDbContext db, IJobQueue queue, DiscoveryWorkflow discovery, ILogger<MatchService> logger)
+public sealed class MatchService(
+    JobsDbContext db,
+    IJobQueue queue,
+    DiscoveryWorkflow discovery,
+    Workers.LocalApplyWorker localWorker,
+    ILogger<MatchService> logger)
 {
     private static readonly TimeSpan InteractiveSearchTimeout = TimeSpan.FromSeconds(90);
 
@@ -65,23 +70,30 @@ public sealed class MatchService(JobsDbContext db, IJobQueue queue, DiscoveryWor
         await db.SaveChangesAsync(ct);
 
         var queued = 0;
+        var queueAvailable = true;
         foreach (var application in applications)
         {
-            try
+            if (queueAvailable)
             {
-                await queue.EnqueueApplyAsync(new ApplyRequest(application.Id), ct);
-                queued++;
+                try
+                {
+                    await queue.EnqueueApplyAsync(new ApplyRequest(application.Id), ct);
+                    queued++;
+                    continue;
+                }
+                catch (Exception ex) when (ex is RequestFailedException or AggregateException or HttpRequestException or TaskCanceledException)
+                {
+                    // Don't retry the queue for every item; prepare the rest locally.
+                    queueAvailable = false;
+                    logger.LogWarning("Apply queue unavailable ({Error}); preparing applications in the Jobs API instead", ex.Message);
+                }
             }
-            catch (Exception ex) when (ex is RequestFailedException or AggregateException or HttpRequestException)
-            {
-                logger.LogWarning(ex, "Could not queue application {ApplicationId}; the scheduler will retry", application.Id);
-            }
+
+            localWorker.Enqueue(application.Id);
         }
 
-        var message = queued == applications.Count
-            ? $"Approved {matches.Count} job(s). Orvanta is preparing your applications in the background."
-            : $"Approved {matches.Count} job(s). {applications.Count - queued} will start shortly (background service is busy).";
-        return ServiceResult<ApproveResult>.Ok(new ApproveResult(matches.Count, queued), message);
+        return ServiceResult<ApproveResult>.Ok(new ApproveResult(matches.Count, applications.Count),
+            $"Approved {matches.Count} job(s). Orvanta is preparing your applications in the background.");
     }
 
     public async Task<ServiceResult<object>> SkipAsync(Guid userId, Guid matchId, CancellationToken ct)

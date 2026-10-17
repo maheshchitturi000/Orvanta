@@ -21,13 +21,26 @@ public interface ILlmClient
 /// <summary>Ollama chat API (https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion).</summary>
 public sealed class OllamaLlmClient(HttpClient http, IOptions<JobsOptions> options, ILogger<OllamaLlmClient> logger) : ILlmClient
 {
+    // Circuit breaker shared by all instances: after a failure, skip the model for a while so
+    // batches (e.g. 20 approved applications) fall back to templates instantly instead of each waiting.
+    private static readonly TimeSpan BreakDuration = TimeSpan.FromMinutes(5);
+    private static long _brokenUntilTicks;
+
     private readonly LlmOptions _options = options.Value.Llm;
 
     public bool IsEnabled => _options.Provider.Equals("ollama", StringComparison.OrdinalIgnoreCase);
 
+    private static bool IsBroken => DateTime.UtcNow.Ticks < Interlocked.Read(ref _brokenUntilTicks);
+
+    private void Break(string reason)
+    {
+        Interlocked.Exchange(ref _brokenUntilTicks, DateTime.UtcNow.Add(BreakDuration).Ticks);
+        logger.LogWarning("LLM unavailable ({Reason}); using fallbacks for {Minutes} minutes", reason, BreakDuration.TotalMinutes);
+    }
+
     public async Task<string?> CompleteAsync(string system, string user, bool json, CancellationToken ct)
     {
-        if (!IsEnabled) return null;
+        if (!IsEnabled || IsBroken) return null;
 
         var body = new JsonObject
         {
@@ -52,7 +65,7 @@ public sealed class OllamaLlmClient(HttpClient http, IOptions<JobsOptions> optio
             using var response = await http.PostAsJsonAsync(new Uri(new Uri(_options.BaseUrl), "api/chat"), body, cts.Token);
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("LLM returned HTTP {Status}", (int)response.StatusCode);
+                Break($"HTTP {(int)response.StatusCode}");
                 return null;
             }
 
@@ -61,7 +74,8 @@ public sealed class OllamaLlmClient(HttpClient http, IOptions<JobsOptions> optio
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or KeyNotFoundException)
         {
-            logger.LogWarning("LLM unavailable ({Error}); using fallback", ex.Message);
+            if (ct.IsCancellationRequested) return null; // caller gave up; not the model's fault
+            Break(ex.Message);
             return null;
         }
     }

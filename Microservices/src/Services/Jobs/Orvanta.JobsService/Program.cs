@@ -18,6 +18,10 @@ builder.Services.AddScoped<CandidateService>();
 builder.Services.AddScoped<MatchService>();
 builder.Services.AddScoped<SourceService>();
 
+// Fallback apply worker (queue unreachable / Functions not running); see LocalApplyWorker.
+builder.Services.AddSingleton<Orvanta.JobsService.Workers.LocalApplyWorker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Orvanta.JobsService.Workers.LocalApplyWorker>());
+
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
 
