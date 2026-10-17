@@ -88,6 +88,14 @@ export interface JobsSummary {
   lastDiscoverySummary: string;
 }
 
+export interface DiscoveryResult {
+  boardsScanned: number;
+  jobsScanned: number;
+  newMatches: number;
+  errors: string[];
+  summary: string;
+}
+
 export interface ApproveResult {
   approved: number;
   queued: number;

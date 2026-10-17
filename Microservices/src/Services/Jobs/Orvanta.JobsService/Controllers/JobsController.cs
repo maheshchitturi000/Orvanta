@@ -62,9 +62,10 @@ public sealed class JobsController(CandidateService candidates, MatchService mat
 
     // ---------- Discovery & matches ----------
 
+    /// <summary>Immediate search (user is waiting). The daily search runs in the background Functions.</summary>
     [HttpPost("discovery/run")]
-    public async Task<ActionResult<ResponseCls<object>>> RunDiscovery(CancellationToken ct) =>
-        Respond(await matches.RunDiscoveryAsync(UserId, ct));
+    public async Task<ActionResult<ResponseCls<DiscoveryResult>>> RunDiscovery(CancellationToken ct) =>
+        Respond(await matches.SearchNowAsync(UserId, ct));
 
     [HttpGet("matches")]
     public async Task<ActionResult<ResponseCls<IReadOnlyList<MatchDto>>>> ListMatches([FromQuery] MatchStatus? status, CancellationToken ct) =>

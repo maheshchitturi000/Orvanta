@@ -28,6 +28,11 @@
     </div>
   </div>
 
+  @if (searching()) {
+    <div class="alert info" role="status">
+      <span class="spinner"></span> Searching your career boards now… this usually takes 10–20 seconds.
+    </div>
+  }
   @if (notice()) {
     <div class="alert success" role="status"><app-icon name="check" [size]="16" /> {{ notice() }}</div>
   }

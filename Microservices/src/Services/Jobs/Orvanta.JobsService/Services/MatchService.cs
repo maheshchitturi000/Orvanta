@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Azure;
 using Microsoft.EntityFrameworkCore;
@@ -11,8 +12,13 @@ using Orvanta.Shared.Responses;
 namespace Orvanta.JobsService.Services;
 
 /// <summary>Matches, one-click approval, applications and the hand-off to the background workflow.</summary>
-public sealed class MatchService(JobsDbContext db, IJobQueue queue, ILogger<MatchService> logger)
+public sealed class MatchService(JobsDbContext db, IJobQueue queue, DiscoveryWorkflow discovery, ILogger<MatchService> logger)
 {
+    private static readonly TimeSpan InteractiveSearchTimeout = TimeSpan.FromSeconds(90);
+
+    // One interactive search per user at a time (double clicks, two tabs). Per instance; the
+    // workflow itself is idempotent, so a rare overlap across instances is harmless.
+    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> SearchLocks = new();
     public async Task<IReadOnlyList<MatchDto>> ListMatchesAsync(Guid userId, MatchStatus? status, CancellationToken ct)
     {
         var query = db.Matches.AsNoTracking().Include(m => m.JobPosting).Where(m => m.UserId == userId);
@@ -89,20 +95,39 @@ public sealed class MatchService(JobsDbContext db, IJobQueue queue, ILogger<Matc
         return ServiceResult<object>.Ok(null!, "Job skipped.");
     }
 
-    public async Task<ServiceResult<object>> RunDiscoveryAsync(Guid userId, CancellationToken ct)
+    /// <summary>
+    /// "Search now": runs discovery immediately and returns the outcome, because the user is waiting
+    /// for it. The daily search uses the same workflow from the background Functions instead.
+    /// </summary>
+    public async Task<ServiceResult<DiscoveryResult>> SearchNowAsync(Guid userId, CancellationToken ct)
     {
         if (!await db.Profiles.AnyAsync(p => p.UserId == userId, ct))
-            return ServiceResult<object>.Fail(409, "Upload your CV before searching for jobs.");
+            return ServiceResult<DiscoveryResult>.Fail(409, "Upload your CV before searching for jobs.");
+
+        var gate = SearchLocks.GetOrAdd(userId, _ => new SemaphoreSlim(1, 1));
+        if (!await gate.WaitAsync(0, ct))
+            return ServiceResult<DiscoveryResult>.Fail(409, "A search is already running. Results will appear in a moment.");
 
         try
         {
-            await queue.EnqueueDiscoveryAsync(new DiscoveryRequest(userId, "manual"), ct);
-            return ServiceResult<object>.Ok(null!, "Searching career boards in the background. New matches appear here in a minute or two.");
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(InteractiveSearchTimeout);
+
+            var outcome = await discovery.RunAsync(userId, timeout.Token);
+            var result = new DiscoveryResult(outcome.BoardsScanned, outcome.JobsScanned, outcome.NewMatches, outcome.Errors, outcome.Summary);
+
+            var message = outcome.NewMatches > 0
+                ? $"Found {outcome.NewMatches} new match{(outcome.NewMatches == 1 ? "" : "es")} in {outcome.JobsScanned:N0} jobs."
+                : $"No new matches in {outcome.JobsScanned:N0} jobs right now. Try more target roles or boards.";
+            return ServiceResult<DiscoveryResult>.Ok(result, message);
         }
-        catch (Exception ex) when (ex is RequestFailedException or AggregateException or HttpRequestException)
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            logger.LogError(ex, "Discovery queue unavailable");
-            return ServiceResult<object>.Fail(503, "The background service is unavailable. Make sure Azurite and the Jobs Functions are running.");
+            return ServiceResult<DiscoveryResult>.Fail(504, "The search took too long. Try again, or remove slow boards from your preferences.");
+        }
+        finally
+        {
+            gate.Release();
         }
     }
 

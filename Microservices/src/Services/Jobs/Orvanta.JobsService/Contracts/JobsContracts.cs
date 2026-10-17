@@ -84,6 +84,8 @@ public sealed class ApproveMatchesRequest
 
 public sealed record ApproveResult(int Approved, int Queued);
 
+public sealed record DiscoveryResult(int BoardsScanned, int JobsScanned, int NewMatches, IReadOnlyList<string> Errors, string Summary);
+
 public sealed record ApplicationDto(
     Guid Id,
     string Status,

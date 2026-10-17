@@ -89,20 +89,16 @@ export class Matches implements OnInit {
     });
   }
 
+  /** Immediate search: the API scans the boards now and answers when done (~15 s). */
   protected async searchNow(): Promise<void> {
     this.searching.set(true);
     this.error.set('');
+    this.notice.set('');
     try {
       const response = await this.api.runDiscovery();
-      this.notice.set(response.statusMessage);
-      // Discovery runs in Azure Functions; poll briefly for the results.
-      for (let attempt = 0; attempt < 12; attempt++) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        await this.state.refresh();
-        const before = this.matches().length;
-        await this.load();
-        if (this.matches().length !== before) break;
-      }
+      const failedBoards = response.statusObject?.errors.length ?? 0;
+      this.notice.set(response.statusMessage + (failedBoards ? ` (${failedBoards} board(s) were unavailable.)` : ''));
+      await Promise.all([this.load(), this.state.refresh()]);
     } catch (error) {
       this.error.set(ApiError.from(error).message);
     } finally {

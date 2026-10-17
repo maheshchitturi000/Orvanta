@@ -8,6 +8,7 @@ import {
   ApplicationStatus,
   ApproveResult,
   CandidateProfile,
+  DiscoveryResult,
   JobApplication,
   JobMatch,
   JobPreferences,
@@ -57,8 +58,9 @@ export class JobsService {
     return this.api.get<string[]>('/jobs/boards/suggested');
   }
 
-  runDiscovery(): Promise<ResponseCls<unknown>> {
-    return this.api.post('/jobs/discovery/run');
+  /** Scans the career boards now and returns the outcome (not queued). */
+  runDiscovery(): Promise<ResponseCls<DiscoveryResult>> {
+    return this.api.post<DiscoveryResult>('/jobs/discovery/run');
   }
 
   matches(status: MatchStatus = 'New'): Promise<ResponseCls<JobMatch[]>> {
