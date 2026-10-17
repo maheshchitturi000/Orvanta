@@ -114,7 +114,13 @@ public sealed class MatchService(JobsDbContext db, IJobQueue queue, DiscoveryWor
             timeout.CancelAfter(InteractiveSearchTimeout);
 
             var outcome = await discovery.RunAsync(userId, timeout.Token);
-            var result = new DiscoveryResult(outcome.BoardsScanned, outcome.JobsScanned, outcome.NewMatches, outcome.Errors, outcome.Summary);
+            var preference = await db.Preferences.AsNoTracking().FirstAsync(p => p.UserId == userId, ct);
+
+            var nearMisses = outcome.NearMisses
+                .Select(n => new NearMissDto(n.Match.Score, n.Job.Company, n.Job.Title, n.Job.Location, n.Job.Source, n.Job.Url, n.Match.Reasons))
+                .ToList();
+            var result = new DiscoveryResult(outcome.BoardsScanned, outcome.JobsScanned, outcome.NewMatches, outcome.Errors,
+                outcome.Summary, nearMisses, Hints(preference, outcome));
 
             var message = outcome.NewMatches > 0
                 ? $"Found {outcome.NewMatches} new match{(outcome.NewMatches == 1 ? "" : "es")} in {outcome.JobsScanned:N0} jobs."
@@ -129,6 +135,30 @@ public sealed class MatchService(JobsDbContext db, IJobQueue queue, DiscoveryWor
         {
             gate.Release();
         }
+    }
+
+    /// <summary>Concrete next steps, most impactful first, when a search returns few matches.</summary>
+    private List<SearchHint> Hints(JobPreference preference, DiscoveryOutcome outcome)
+    {
+        var hints = new List<SearchHint>();
+        if (outcome.NewMatches >= 5) return hints;
+
+        if (preference.DesiredTitles.Count == 0)
+            hints.Add(new("Add your target roles (e.g. .NET Developer, Full Stack Developer). Without them only your CV title is matched.", "profile"));
+
+        if (!discovery.SearchSourcesConfigured)
+            hints.Add(new("LinkedIn, Naukri and Indeed search is off: add your free JSearch API key (see README → Job sources). Right now only company career boards are scanned.", null));
+
+        // Only suggest lowering the bar for genuine near misses, not jobs held back on purpose
+        // (wrong role, missing core skill, far more experience required).
+        var closest = outcome.NearMisses.Where(n => !n.Match.Capped).Select(n => n.Match.Score).DefaultIfEmpty(0).Max();
+        if (closest >= 70 && preference.MinMatchScore > closest)
+            hints.Add(new($"Your closest jobs scored {closest}%. Lower the minimum match to {closest / 5 * 5}% to review them.", "profile"));
+
+        if (preference.Locations.Count > 0 && !preference.IncludeRemote)
+            hints.Add(new("Turn on \"Include remote jobs\" to also see remote roles open to your country.", "profile"));
+
+        return hints;
     }
 
     public async Task<IReadOnlyList<ApplicationDto>> ListApplicationsAsync(Guid userId, ApplicationStatus? status, CancellationToken ct)

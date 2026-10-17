@@ -40,6 +40,42 @@
     <div class="alert error" role="alert"><app-icon name="alert" [size]="16" /> {{ error() }}</div>
   }
 
+  @if (lastSearch(); as s) {
+    @if (s.hints.length) {
+      <section class="hints" aria-label="How to get more matches">
+        <h3><app-icon name="sparkles" [size]="16" /> How to get more matches</h3>
+        <ul>
+          @for (h of s.hints; track h.message) {
+            <li>
+              <span>{{ h.message }}</span>
+              @if (h.link) {
+                <a class="btn btn-outline btn-sm" [routerLink]="'../' + h.link">Fix</a>
+              }
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
+    @if (s.nearMisses.length && s.newMatches === 0) {
+      <section class="near" aria-label="Closest jobs below your minimum match">
+        <h3>Closest jobs <small>below your minimum match, not queued</small></h3>
+        <ul>
+          @for (n of s.nearMisses; track n.url + n.title) {
+            <li>
+              <span class="near-score">{{ n.score }}%</span>
+              <div class="near-info">
+                <a [href]="n.url" target="_blank" rel="noopener"><strong>{{ n.title }}</strong></a>
+                <small>{{ n.company }} · {{ n.location || 'Location not listed' }} · via {{ sourceLabel(n.source) }}</small>
+                <small class="why">{{ n.reasons.slice(1).join(' ') }}</small>
+              </div>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  }
+
   @if (loading() && !matches().length) {
     @for (i of [1, 2, 3]; track i) {
       <div class="card skeleton"></div>

@@ -9,8 +9,13 @@ using Orvanta.Jobs.Core.Sources;
 
 namespace Orvanta.Jobs.Core.Workflow;
 
+/// <summary>A job that scored below the user's bar, shown so "0 matches" is explainable.</summary>
+public sealed record NearMiss(SourcedJob Job, MatchResult Match);
+
 public sealed record DiscoveryOutcome(int BoardsScanned, int JobsScanned, int NewMatches, IReadOnlyList<string> Errors, int SearchesRun = 0)
 {
+    public IReadOnlyList<NearMiss> NearMisses { get; init; } = [];
+
     public string Summary =>
         $"Scanned {JobsScanned} jobs on {BoardsScanned} boards" +
         (SearchesRun > 0 ? $" + {SearchesRun} LinkedIn/Naukri/Indeed search{(SearchesRun == 1 ? "" : "es")}" : string.Empty) +
@@ -31,6 +36,11 @@ public sealed class DiscoveryWorkflow(
     ILogger<DiscoveryWorkflow> logger)
 {
     private static readonly TimeSpan BoardCacheDuration = TimeSpan.FromMinutes(30);
+    private const int NearMissFloor = 50;
+    private const int NearMissCount = 5;
+
+    /// <summary>True when a search source (LinkedIn/Naukri/Indeed via JSearch) has credentials.</summary>
+    public bool SearchSourcesConfigured => searchSources.Any(s => s.IsConfigured);
     private readonly JobsOptions _options = options.Value;
 
     public async Task<DiscoveryOutcome> RunAsync(Guid userId, CancellationToken ct)
@@ -73,6 +83,7 @@ public sealed class DiscoveryWorkflow(
         var unique = jobs.DistinctBy(DuplicateKey).ToList();
 
         var candidates = new List<(SourcedJob Job, MatchResult Match)>();
+        var belowBar = new List<NearMiss>();
         foreach (var job in unique)
         {
             if (job.PostedAtUtc is { } posted && posted < oldest) continue;
@@ -83,10 +94,17 @@ public sealed class DiscoveryWorkflow(
             {
                 candidates.Add((job, match));
             }
+            else if (match.Score >= NearMissFloor)
+            {
+                belowBar.Add(new NearMiss(job, match));
+            }
         }
 
         var newMatches = await SaveMatchesAsync(userId, candidates.OrderByDescending(c => c.Match.Score).ToList(), ct);
-        var outcome = new DiscoveryOutcome(boards.Count, unique.Count, newMatches, errors, searchesRun);
+        var outcome = new DiscoveryOutcome(boards.Count, unique.Count, newMatches, errors, searchesRun)
+        {
+            NearMisses = belowBar.OrderByDescending(n => n.Match.Score).Take(NearMissCount).ToList()
+        };
 
         preference.LastDiscoveryAtUtc = DateTime.UtcNow;
         preference.LastDiscoverySummary = outcome.Summary.Length > 500 ? outcome.Summary[..500] : outcome.Summary;

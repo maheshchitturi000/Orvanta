@@ -8,7 +8,11 @@ public sealed record MatchResult(
     int Score,
     IReadOnlyList<string> MatchedSkills,
     IReadOnlyList<string> MissingSkills,
-    IReadOnlyList<string> Reasons);
+    IReadOnlyList<string> Reasons)
+{
+    /// <summary>True when a guard (role mismatch, missing core skill, experience gap) limited the score.</summary>
+    public bool Capped { get; init; }
+}
 
 /// <summary>
 /// Deterministic, explainable CV ↔ job scoring (0-100):
@@ -112,7 +116,8 @@ public static partial class JobMatcher
                 : $"Asks for {required:0}+ years; you have {profile.TotalYearsExperience:0.#}.");
         }
 
-        var score = (int)Math.Round(skillRatio * SkillWeight + roleRatio * RoleWeight + experienceRatio * ExperienceWeight);
+        var raw = (int)Math.Round(skillRatio * SkillWeight + roleRatio * RoleWeight + experienceRatio * ExperienceWeight);
+        var score = raw;
         if (roleRatio == 0)
         {
             score = Math.Min(score, NoRoleCap);
@@ -129,7 +134,7 @@ public static partial class JobMatcher
             score = Math.Min(score, ExperienceGapCap);
         }
 
-        return new MatchResult(Math.Clamp(score, 0, 100), matched, missing, reasons);
+        return new MatchResult(Math.Clamp(score, 0, 100), matched, missing, reasons) { Capped = score < raw || roleRatio == 0 };
     }
 
     /// <summary>Location / remote / company filters applied before scoring.</summary>

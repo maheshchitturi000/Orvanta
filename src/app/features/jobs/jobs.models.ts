@@ -88,12 +88,30 @@ export interface JobsSummary {
   lastDiscoverySummary: string;
 }
 
+export interface NearMiss {
+  score: number;
+  company: string;
+  title: string;
+  location: string;
+  source: string;
+  url: string;
+  reasons: string[];
+}
+
+export interface SearchHint {
+  message: string;
+  /** Route inside the Jobs section, e.g. "profile". */
+  link: string | null;
+}
+
 export interface DiscoveryResult {
   boardsScanned: number;
   jobsScanned: number;
   newMatches: number;
   errors: string[];
   summary: string;
+  nearMisses: NearMiss[];
+  hints: SearchHint[];
 }
 
 export interface ApproveResult {

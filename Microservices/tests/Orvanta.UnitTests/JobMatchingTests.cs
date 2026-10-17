@@ -142,6 +142,7 @@ public class JobMatcherTests
         var result = JobMatcher.Score(junior, Preference, job);
 
         Assert.True(result.Score <= 70, $"score was {result.Score}");
+        Assert.True(result.Capped);
     }
 
     [Fact]

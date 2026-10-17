@@ -84,7 +84,19 @@ public sealed class ApproveMatchesRequest
 
 public sealed record ApproveResult(int Approved, int Queued);
 
-public sealed record DiscoveryResult(int BoardsScanned, int JobsScanned, int NewMatches, IReadOnlyList<string> Errors, string Summary);
+public sealed record NearMissDto(int Score, string Company, string Title, string Location, string Source, string Url, IReadOnlyList<string> Reasons);
+
+/// <summary>An actionable tip shown when a search finds little; Link is a route in the Jobs section.</summary>
+public sealed record SearchHint(string Message, string? Link);
+
+public sealed record DiscoveryResult(
+    int BoardsScanned,
+    int JobsScanned,
+    int NewMatches,
+    IReadOnlyList<string> Errors,
+    string Summary,
+    IReadOnlyList<NearMissDto> NearMisses,
+    IReadOnlyList<SearchHint> Hints);
 
 public sealed record ApplicationDto(
     Guid Id,

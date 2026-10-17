@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiError } from '../../../core/models/response-cls.model';
 import { ChipInput } from '../../../shared/ui/chip-input/chip-input';
@@ -32,6 +32,18 @@ export class JobProfile implements OnInit {
   protected readonly savingProfile = signal(false);
   protected readonly savingPrefs = signal(false);
   protected readonly message = signal<{ kind: 'success' | 'error'; text: string } | null>(null);
+
+  /** One-click role ideas from the CV title and skills. */
+  protected readonly roleSuggestions = computed(() => {
+    const p = this.profile();
+    const skills = (p?.skills ?? []).map(s => s.toLowerCase());
+    const ideas = [p?.currentTitle ?? '', 'Software Engineer'];
+    if (skills.some(s => ['c#', '.net', 'asp.net core'].includes(s))) ideas.push('.NET Developer', 'Backend Developer');
+    if (skills.some(s => ['angular', 'react', 'vue'].includes(s)) && ideas.includes('.NET Developer')) ideas.push('Full Stack Developer');
+    if (skills.includes('java')) ideas.push('Java Developer');
+    if (skills.includes('python')) ideas.push('Python Developer');
+    return [...new Set(ideas.map(t => t.trim()).filter(t => t.length > 1))].map(t => t.replace(/\b\w/g, c => c.toUpperCase()).replace('.Net', '.NET'));
+  });
 
   protected readonly hours = Array.from({ length: 24 }, (_, h) => h);
   protected readonly timeZones = supportedTimeZones();

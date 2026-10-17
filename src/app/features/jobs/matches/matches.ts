@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { ApiError } from '../../../core/models/response-cls.model';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { JobsState } from '../jobs-state.service';
-import { JobMatch } from '../jobs.models';
+import { DiscoveryResult, JobMatch } from '../jobs.models';
 import { JobsService } from '../jobs.service';
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -38,6 +38,8 @@ export class Matches implements OnInit {
   protected readonly searching = signal(false);
   protected readonly error = signal('');
   protected readonly notice = signal('');
+  /** Outcome of the last "Search now": hints and closest jobs when matches are few. */
+  protected readonly lastSearch = signal<DiscoveryResult | null>(null);
 
   protected readonly allSelected = computed(() => this.matches().length > 0 && this.selected().size === this.matches().length);
   protected readonly needsCv = computed(() => this.state.summary()?.hasCv === false);
@@ -107,6 +109,7 @@ export class Matches implements OnInit {
     this.notice.set('');
     try {
       const response = await this.api.runDiscovery();
+      this.lastSearch.set(response.statusObject);
       const failedBoards = response.statusObject?.errors.length ?? 0;
       this.notice.set(response.statusMessage + (failedBoards ? ` (${failedBoards} board(s) were unavailable.)` : ''));
       await Promise.all([this.load(), this.state.refresh()]);
