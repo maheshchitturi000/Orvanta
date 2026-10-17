@@ -31,14 +31,22 @@ async function refresh() {
     return;
   }
 
+  const auto = status.auto || {};
+  const autoLine = auto.enabled
+    ? (auto.remaining > 0 ? `Auto-submit ON · ${auto.remaining} left today` : 'Auto-submit paused · daily limit reached')
+    : 'Auto-submit OFF · you press Submit (change in Options)';
   render(`
     <div class="card">
       <div class="big">${status.ready}</div>
       <small>approved application${status.ready === 1 ? '' : 's'} ready to submit</small>
     </div>
-    <button id="start" class="primary" ${status.ready ? '' : 'disabled'}>Start applying</button>
+    <p><small>${autoLine}</small></p>
+    <button id="start" class="primary" ${status.ready ? '' : 'disabled'}>${auto.autoSubmit ? 'Start auto-applying' : 'Start applying'}</button>
     <button id="fill">Fill this page</button>
+    <button id="settings">Auto-submit settings</button>
     <p><small>Use “Fill this page” on any application form, e.g. a LinkedIn Easy Apply step.</small></p>`);
+
+  document.getElementById('settings').onclick = () => chrome.runtime.openOptionsPage();
 
   document.getElementById('start').onclick = async () => {
     // Jobs found via LinkedIn/Naukri/Indeed can open on any company site. Ask once (must be in this

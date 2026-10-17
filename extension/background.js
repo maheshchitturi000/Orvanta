@@ -127,7 +127,30 @@ async function openCurrent(run) {
   await setRun(run);
 }
 
-async function advance(markSubmitted) {
+// ---------- Auto-submit settings (opt-in, daily limit) ----------
+
+const DEFAULT_DAILY_LIMIT = 15;
+const NEXT_JOB_ALARM = 'orvanta-next-job';
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function autoSettings() {
+  const { autoSubmit = false, autoSubmitAcknowledged = false, dailyLimit = DEFAULT_DAILY_LIMIT } =
+    await chrome.storage.sync.get(['autoSubmit', 'autoSubmitAcknowledged', 'dailyLimit']);
+  const { autoDay, autoCount = 0 } = await chrome.storage.local.get(['autoDay', 'autoCount']);
+  const usedToday = autoDay === today() ? autoCount : 0;
+  const remaining = Math.max(dailyLimit - usedToday, 0);
+  return { autoSubmit: autoSubmit && autoSubmitAcknowledged && remaining > 0, enabled: autoSubmit && autoSubmitAcknowledged, remaining, dailyLimit };
+}
+
+async function countAutoSubmission() {
+  const { autoDay, autoCount = 0 } = await chrome.storage.local.get(['autoDay', 'autoCount']);
+  await chrome.storage.local.set({ autoDay: today(), autoCount: autoDay === today() ? autoCount + 1 : 1 });
+}
+
+async function advance(markSubmitted, automatic = false) {
   const run = await getRun();
   if (!run) return;
 
@@ -135,17 +158,30 @@ async function advance(markSubmitted) {
   if (markSubmitted && id) {
     await api(`/jobs/applications/${id}/submitted`, { method: 'POST' });
     run.done++;
+    if (automatic) await countAutoSubmission();
   }
   run.index++;
   await setRun(run);
+  await chrome.action.setBadgeText({ text: '' });
 
   if (run.index >= run.queue.length) {
     await setRun(null);
-    await chrome.action.setBadgeText({ text: '' });
     return;
   }
-  await openCurrent(run);
+
+  // In auto mode, pause between applications instead of submitting back to back.
+  if ((await autoSettings()).autoSubmit) {
+    await chrome.alarms.create(NEXT_JOB_ALARM, { delayInMinutes: 0.5 });
+  } else {
+    await openCurrent(run);
+  }
 }
+
+chrome.alarms.onAlarm.addListener(async alarm => {
+  if (alarm.name !== NEXT_JOB_ALARM) return;
+  const run = await getRun();
+  if (run) await openCurrent(run);
+});
 
 async function taskForTab(tabId) {
   const run = await getRun();
@@ -177,7 +213,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const run = await getRun();
         try {
           const ready = await readyApplications();
-          return { signedIn: true, ready: ready.length, running: !!run, position: run ? run.index + 1 : 0, total: run?.queue.length ?? 0 };
+          const auto = await autoSettings();
+          return { signedIn: true, ready: ready.length, running: !!run, position: run ? run.index + 1 : 0, total: run?.queue.length ?? 0, auto };
         } catch (e) {
           return { signedIn: false, error: e.message };
         }
@@ -185,14 +222,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'start':
         return await startRun();
       case 'stop':
+        await chrome.alarms.clear(NEXT_JOB_ALARM);
         await setRun(null);
+        await chrome.action.setBadgeText({ text: '' });
         return { stopped: true };
       case 'task': // content script asks: is this tab part of the run?
         return await taskForTab(sender.tab?.id);
       case 'cv':
         return await cvAsDataUrl();
       case 'submitted':
-        await advance(true);
+        await advance(true, !!message.automatic);
+        return { ok: true };
+      case 'settings':
+        return await autoSettings();
+      case 'needs-user':
+        // Auto mode paused on this job: flag it so the user notices.
+        await chrome.action.setBadgeBackgroundColor({ color: '#d93a4a' });
+        await chrome.action.setBadgeText({ text: '!' });
         return { ok: true };
       case 'skip':
         await advance(false);

@@ -11,7 +11,7 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["storage", "tabs", "activeTab", "scripting"],
+  "permissions": ["storage", "tabs", "activeTab", "scripting", "alarms"],
   "host_permissions": [
     "http://localhost:5095/*",
     "https://job-boards.greenhouse.io/*",
@@ -39,6 +39,6 @@
   ],
   "options_ui": {
     "page": "options.html",
-    "open_in_tab": false
+    "open_in_tab": true
   }
 }

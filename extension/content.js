@@ -134,13 +134,21 @@
     const { application, position, total } = task;
 
     if (CONFIRMATION.test(document.body.innerText)) {
+      const auto = (await chrome.runtime.sendMessage({ type: 'settings' }))?.autoSubmit;
       banner(`<b>Submitted ✓</b> ${escapeHtml(application.job.title)} at ${escapeHtml(application.job.company)}. Moving to the next job…`);
-      await chrome.runtime.sendMessage({ type: 'submitted' });
+      await chrome.runtime.sendMessage({ type: 'submitted', automatic: !!auto });
       return;
     }
 
     // Forms render client-side on some boards; give them a moment.
     await new Promise(resolve => setTimeout(resolve, 1200));
+
+    const settings = await chrome.runtime.sendMessage({ type: 'settings' });
+    if (settings?.autoSubmit) {
+      await autoApply(application, position, total);
+      return;
+    }
+
     let total_filled = fill(application.answers, application.coverLetter);
     const cv = await attachCv();
 
@@ -182,6 +190,124 @@
       }, 700);
     });
     observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  // ---------- Auto-submit (opt-in in Options, daily limit enforced by the background) ----------
+
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const humanPause = () => sleep(1500 + Math.random() * 2500);
+
+  /** Scope searches to an open application dialog (LinkedIn Easy Apply) when there is one. */
+  function formRoot() {
+    const dialogs = [...document.querySelectorAll('[role="dialog"], .jobs-easy-apply-modal')].filter(isVisible);
+    return dialogs.at(-1) || document;
+  }
+
+  function buttonText(el) {
+    return (el.innerText || el.value || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function findButton(root, pattern) {
+    return [...root.querySelectorAll('button, input[type="submit"], [role="button"]')]
+      .filter(el => isVisible(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true')
+      // Never follow "Apply on company website" style buttons: they leave the site.
+      .filter(el => !/company website|external/i.test(el.getAttribute('aria-label') || ''))
+      .find(el => pattern.test(buttonText(el)));
+  }
+
+  /** Required fields still empty, and consent boxes we must not tick for the user. */
+  function blockers(root) {
+    const problems = [];
+    const fields = [...root.querySelectorAll('input, textarea, select')].filter(el => isVisible(el) && !el.disabled);
+
+    for (const el of fields) {
+      const required = el.required || el.getAttribute('aria-required') === 'true';
+      if (!required) continue;
+      const label = labelText(el).slice(0, 80) || 'A required question';
+
+      if (el.type === 'checkbox') {
+        if (!el.checked) problems.push(`${label} (needs your consent)`);
+      } else if (el.type === 'radio') {
+        const group = root.querySelectorAll(`input[type="radio"][name="${CSS.escape(el.name)}"]`);
+        if (![...group].some(r => r.checked) && !problems.includes(label)) problems.push(label);
+      } else if (el.type === 'file') {
+        if (!el.files?.length) problems.push(label);
+      } else if (!String(el.value || '').trim()) {
+        problems.push(label);
+      }
+    }
+    return [...new Set(problems)];
+  }
+
+  async function autoApply(application, position, total) {
+    const title = `${escapeHtml(application.job.title)} at ${escapeHtml(application.job.company)}`;
+    banner(`<b>Auto-applying ${position} of ${total}:</b> ${title}`, [
+      { label: 'Stop auto', onClick: () => chrome.runtime.sendMessage({ type: 'stop' }) }
+    ]);
+
+    const pause = reasons => {
+      chrome.runtime.sendMessage({ type: 'needs-user' });
+      banner(
+        `<b>Orvanta needs you</b> on ${title}:<br>• ${reasons.map(escapeHtml).join('<br>• ')}<br>` +
+        'Complete it and press the site\'s Submit button, or skip this job.',
+        [
+          { label: 'I submitted it', primary: true, onClick: () => chrome.runtime.sendMessage({ type: 'submitted' }) },
+          { label: 'Resume auto', onClick: () => autoApply(application, position, total) },
+          { label: 'Skip', onClick: () => chrome.runtime.sendMessage({ type: 'skip' }) }
+        ]
+      );
+    };
+
+    for (let step = 0; step < 15; step++) {
+      if (CONFIRMATION.test(document.body.innerText)) {
+        banner(`<b>Submitted ✓</b> ${title}. Next job in about 30 seconds…`);
+        await chrome.runtime.sendMessage({ type: 'submitted', automatic: true });
+        return;
+      }
+
+      // LinkedIn job page: open the Easy Apply dialog. A plain "Apply" button leaves LinkedIn, so stop.
+      if (step === 0 && location.hostname.endsWith('linkedin.com')) {
+        const easyApply = findButton(document, /^easy apply$/i);
+        if (easyApply) {
+          easyApply.click();
+          await humanPause();
+          continue;
+        }
+        if (findButton(document, /^apply$/i)) {
+          pause(['This LinkedIn job is applied for on the company\'s own website.']);
+          return;
+        }
+      }
+
+      const root = formRoot();
+      fill(application.answers, application.coverLetter);
+      await attachCv();
+      await humanPause();
+
+      const missing = blockers(root);
+      if (missing.length) {
+        pause(missing.slice(0, 4));
+        return;
+      }
+
+      const submit = findButton(root, /^(submit application|submit|send application|apply now)$/i);
+      if (submit) {
+        submit.click();
+        await sleep(4000);
+        continue; // next loop iteration checks for the confirmation (or new required fields)
+      }
+
+      const next = findButton(root, /^(next|continue|review|review your application|continue to next step|save and continue)$/i);
+      if (next) {
+        next.click();
+        continue;
+      }
+
+      pause(['Orvanta couldn\'t find the Next or Submit button on this page.']);
+      return;
+    }
+
+    pause(['This application has more steps than expected.']);
   }
 
   function escapeHtml(text) {

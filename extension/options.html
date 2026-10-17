@@ -4,18 +4,43 @@
   <meta charset="utf-8">
   <title>Orvanta options</title>
   <style>
-    body { margin: 0; padding: 16px; font: 14px/1.45 Inter, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1d1636; }
-    label { display: block; font-weight: 600; margin-bottom: 6px; }
-    input { width: 100%; box-sizing: border-box; height: 38px; padding: 0 10px; border: 1px solid #ddd6f3; border-radius: 10px; font: inherit; }
-    button { margin-top: 10px; height: 36px; padding: 0 16px; border: 0; border-radius: 10px; background: #7c5cff; color: #fff; font-weight: 600; cursor: pointer; }
+    body { margin: 0; padding: 16px; font: 14px/1.5 Inter, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1d1636; min-width: 380px; }
+    h2 { font-size: 15px; margin: 18px 0 8px; }
+    label.block { display: block; font-weight: 600; margin-bottom: 6px; }
+    input[type=text], input[type=number] { width: 100%; box-sizing: border-box; height: 38px; padding: 0 10px; border: 1px solid #ddd6f3; border-radius: 10px; font: inherit; }
+    input[type=number] { width: 90px; }
+    .toggle { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; cursor: pointer; }
+    .toggle input { width: 18px; height: 18px; margin-top: 2px; accent-color: #7c5cff; }
+    .warn { padding: 10px 12px; border-radius: 10px; background: #fff8eb; border: 1px solid #fde7bf; color: #7a5212; font-size: 13px; }
+    button { margin-top: 12px; height: 36px; padding: 0 16px; border: 0; border-radius: 10px; background: #7c5cff; color: #fff; font-weight: 600; cursor: pointer; }
     small { color: #6e6790; }
+    #saved { margin-left: 8px; }
   </style>
 </head>
 <body>
-  <label for="api">Orvanta API (Gateway) URL</label>
-  <input id="api" placeholder="http://localhost:5095/api">
-  <small>Change this when Orvanta is deployed. Remember to add the host to the extension's host permissions.</small>
-  <br><button id="save">Save</button> <small id="saved"></small>
+  <label class="block" for="api">Orvanta API (Gateway) URL</label>
+  <input id="api" type="text" placeholder="http://localhost:5095/api">
+  <small>Change this when Orvanta is deployed, and add the host to host_permissions in manifest.json.</small>
+
+  <h2>Auto-submit</h2>
+  <label class="toggle">
+    <input id="auto" type="checkbox">
+    <span><b>Submit approved applications automatically</b><br>
+      <small>Orvanta clicks Easy Apply / Next / Submit for jobs you approved. It pauses and asks you for unknown required questions, consent checkboxes, and jobs that apply on another website.</small></span>
+  </label>
+  <div class="warn">
+    LinkedIn, Naukri and other job sites prohibit automated activity in their terms and may restrict accounts that use it.
+    Keep the daily limit low and review your approved jobs first.
+  </div>
+  <label class="toggle">
+    <input id="ack" type="checkbox">
+    <span>I understand the risk to my job-site accounts and want Orvanta to submit for me.</span>
+  </label>
+  <label class="block" for="limit">Daily limit</label>
+  <input id="limit" type="number" min="1" max="50" step="1">
+  <small>Applications submitted automatically per day (1–50).</small>
+
+  <br><button id="save">Save</button><small id="saved"></small>
   <script src="options.js"></script>
 </body>
 </html>
