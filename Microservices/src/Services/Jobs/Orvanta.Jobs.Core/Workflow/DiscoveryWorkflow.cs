@@ -16,6 +16,12 @@ public sealed record DiscoveryOutcome(int BoardsScanned, int JobsScanned, int Ne
 {
     public IReadOnlyList<NearMiss> NearMisses { get; init; } = [];
 
+    /// <summary>False when no LinkedIn/Naukri/Indeed search source is connected for the user.</summary>
+    public bool SearchConnected { get; init; }
+
+    /// <summary>The roles searched for (chosen by the user, or derived from the CV).</summary>
+    public IReadOnlyList<string> RolesUsed { get; init; } = [];
+
     public string Summary =>
         $"Scanned {JobsScanned} jobs on {BoardsScanned} boards" +
         (SearchesRun > 0 ? $" + {SearchesRun} LinkedIn/Naukri/Indeed search{(SearchesRun == 1 ? "" : "es")}" : string.Empty) +
@@ -31,6 +37,7 @@ public sealed class DiscoveryWorkflow(
     JobsDbContext db,
     JobSourceRegistry sources,
     IEnumerable<IJobSearchSource> searchSources,
+    JobSourceCredentials credentials,
     IMemoryCache cache,
     IOptions<JobsOptions> options,
     ILogger<DiscoveryWorkflow> logger)
@@ -39,8 +46,6 @@ public sealed class DiscoveryWorkflow(
     private const int NearMissFloor = 50;
     private const int NearMissCount = 5;
 
-    /// <summary>True when a search source (LinkedIn/Naukri/Indeed via JSearch) has credentials.</summary>
-    public bool SearchSourcesConfigured => searchSources.Any(s => s.IsConfigured);
     private readonly JobsOptions _options = options.Value;
 
     public async Task<DiscoveryOutcome> RunAsync(Guid userId, CancellationToken ct)
@@ -69,14 +74,20 @@ public sealed class DiscoveryWorkflow(
         }
 
         var queries = BuildQueries(profile, preference);
-        foreach (var search in searchSources.Where(s => s.IsConfigured))
+        var searchesRun = 0;
+        var searchConnected = false;
+        foreach (var search in searchSources)
         {
+            var apiKey = await credentials.GetKeyAsync(userId, search.Name, ct);
+            if (apiKey is null) continue;
+
+            searchConnected = true;
             foreach (var query in queries)
             {
-                jobs.AddRange(await SearchAsync(search, query, errors, ct));
+                jobs.AddRange(await SearchAsync(search, query, apiKey, errors, ct));
+                searchesRun++;
             }
         }
-        var searchesRun = searchSources.Any(s => s.IsConfigured) ? queries.Count : 0;
 
         // The same job often appears on its company board and on LinkedIn/Indeed; keep the first
         // (boards come first, and their direct ATS links are the easiest to fill).
@@ -103,7 +114,9 @@ public sealed class DiscoveryWorkflow(
         var newMatches = await SaveMatchesAsync(userId, candidates.OrderByDescending(c => c.Match.Score).ToList(), ct);
         var outcome = new DiscoveryOutcome(boards.Count, unique.Count, newMatches, errors, searchesRun)
         {
-            NearMisses = belowBar.OrderByDescending(n => n.Match.Score).Take(NearMissCount).ToList()
+            NearMisses = belowBar.OrderByDescending(n => n.Match.Score).Take(NearMissCount).ToList(),
+            SearchConnected = searchConnected,
+            RolesUsed = RoleSuggester.EffectiveRoles(profile, preference)
         };
 
         preference.LastDiscoveryAtUtc = DateTime.UtcNow;
@@ -120,9 +133,7 @@ public sealed class DiscoveryWorkflow(
     /// </summary>
     public IReadOnlyList<JobSearchQuery> BuildQueries(CandidateProfile profile, JobPreference preference)
     {
-        var roles = preference.DesiredTitles.Count > 0
-            ? preference.DesiredTitles
-            : string.IsNullOrWhiteSpace(profile.CurrentTitle) ? [] : [profile.CurrentTitle];
+        var roles = RoleSuggester.EffectiveRoles(profile, preference);
 
         IEnumerable<JobSearchQuery> queries = preference.RemoteOnly || preference.Locations.Count == 0
             ? roles.Select(r => new JobSearchQuery(r, null, preference.RemoteOnly))
@@ -134,7 +145,7 @@ public sealed class DiscoveryWorkflow(
         return queries.Take(Math.Max(_options.JSearch.MaxQueriesPerRun, 0)).ToList();
     }
 
-    private async Task<IReadOnlyList<SourcedJob>> SearchAsync(IJobSearchSource source, JobSearchQuery query, List<string> errors, CancellationToken ct)
+    private async Task<IReadOnlyList<SourcedJob>> SearchAsync(IJobSearchSource source, JobSearchQuery query, string apiKey, List<string> errors, CancellationToken ct)
     {
         // Search quotas are small (≈200/month on free plans): reuse results for a few hours.
         var key = $"search:{source.Name}:{query.Role}|{query.Location}|{query.RemoteOnly}".ToLowerInvariant();
@@ -145,7 +156,7 @@ public sealed class DiscoveryWorkflow(
 
         try
         {
-            var jobs = await source.SearchAsync(query, ct);
+            var jobs = await source.SearchAsync(query, apiKey, ct);
             cache.Set(key, jobs, TimeSpan.FromHours(Math.Max(_options.JSearch.CacheHours, 1)));
             return jobs;
         }

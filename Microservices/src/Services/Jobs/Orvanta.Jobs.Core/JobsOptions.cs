@@ -13,6 +13,9 @@ public sealed class JobsOptions
     /// <summary>Boards scanned when the user hasn't chosen any, as "provider:board".</summary>
     public List<string> DefaultBoards { get; set; } = [];
 
+    /// <summary>Base64 32-byte key that encrypts users' source credentials. Same value for the API and the Functions.</summary>
+    public string SecretsKey { get; set; } = string.Empty;
+
     public LlmOptions Llm { get; set; } = new();
 
     public JSearchOptions JSearch { get; set; } = new();

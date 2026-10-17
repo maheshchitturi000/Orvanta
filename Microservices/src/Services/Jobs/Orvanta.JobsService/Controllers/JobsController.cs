@@ -11,7 +11,7 @@ namespace Orvanta.JobsService.Controllers;
 
 [Route("api/jobs")]
 [Authorize(Policy = "UserOnly")]
-public sealed class JobsController(CandidateService candidates, MatchService matches) : ApiControllerBase
+public sealed class JobsController(CandidateService candidates, MatchService matches, SourceService sources) : ApiControllerBase
 {
     private Guid UserId => User.GetUserId();
 
@@ -59,6 +59,20 @@ public sealed class JobsController(CandidateService candidates, MatchService mat
     [HttpGet("boards/suggested")]
     public ActionResult<ResponseCls<IReadOnlyList<string>>> SuggestedBoards() =>
         Respond(ServiceResult<IReadOnlyList<string>>.Ok(candidates.SuggestedBoards()));
+
+    // ---------- Job search sources (LinkedIn · Naukri · Indeed via JSearch) ----------
+
+    [HttpGet("sources")]
+    public async Task<ActionResult<ResponseCls<IReadOnlyList<SourceStatusDto>>>> Sources(CancellationToken ct) =>
+        Respond(ServiceResult<IReadOnlyList<SourceStatusDto>>.Ok(await sources.ListAsync(UserId, ct)));
+
+    [HttpPut("sources/{name}")]
+    public async Task<ActionResult<ResponseCls<SourceStatusDto>>> ConnectSource(string name, ConnectSourceRequest request, CancellationToken ct) =>
+        Respond(await sources.ConnectAsync(UserId, name, request.ApiKey, ct));
+
+    [HttpDelete("sources/{name}")]
+    public async Task<ActionResult<ResponseCls<object>>> DisconnectSource(string name, CancellationToken ct) =>
+        Respond(await sources.DisconnectAsync(UserId, name, ct));
 
     // ---------- Discovery & matches ----------
 

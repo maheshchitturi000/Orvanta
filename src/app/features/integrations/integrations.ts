@@ -3,6 +3,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiError } from '../../core/models/response-cls.model';
 import { Icon } from '../../shared/ui/icon/icon';
+import { JobSources } from './job-sources/job-sources';
 import { IntegrationsService, ProviderAddress, ProviderStatus } from './integrations.service';
 
 interface AddressPanel {
@@ -20,7 +21,7 @@ const PROVIDER_META: Record<string, { letter: string; blurb: string }> = {
 
 @Component({
   selector: 'app-integrations',
-  imports: [DatePipe, Icon],
+  imports: [DatePipe, Icon, JobSources],
   templateUrl: './integrations.html',
   styleUrl: './integrations.scss'
 })

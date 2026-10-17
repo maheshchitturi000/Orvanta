@@ -25,4 +25,10 @@ dotnet user-secrets set 'AuthSecurity:PasswordPepper' (New-Key 32) --project $au
 dotnet user-secrets set 'AuthSecurity:OtpHmacKey' (New-Key 32) --project $auth | Out-Null
 dotnet user-secrets set 'DataProtection:Key' (New-Key 32) --project $food | Out-Null
 
+# Jobs API + Jobs Functions share one user-secrets store.
+$jobs = Join-Path $root 'src/Services/Jobs/Orvanta.JobsService'
+dotnet user-secrets set 'Jwt:SigningKey' $signingKey --project $jobs | Out-Null
+dotnet user-secrets set 'Jwt:EncryptionKey' $encryptionKey --project $jobs | Out-Null
+dotnet user-secrets set 'Jobs:SecretsKey' (New-Key 32) --project $jobs | Out-Null
+
 Write-Host 'Development secrets created. Note: re-running this changes the pepper, so existing local accounts must re-register.'

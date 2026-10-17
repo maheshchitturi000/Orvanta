@@ -16,6 +16,7 @@ builder.Services.AddJobsCore(builder.Configuration);
 
 builder.Services.AddScoped<CandidateService>();
 builder.Services.AddScoped<MatchService>();
+builder.Services.AddScoped<SourceService>();
 
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
@@ -28,6 +29,7 @@ if (app.Environment.IsDevelopment())
     using var scope = app.Services.CreateScope();
     var database = scope.ServiceProvider.GetRequiredService<JobsDbContext>().Database;
     await database.EnsureCreatedAsync();
+    await database.ExecuteSqlRawAsync(JobsDbContext.DevelopmentSchemaPatches);
     await database.ExecuteSqlRawAsync("ALTER DATABASE CURRENT SET AUTO_CLOSE OFF");
 }
 

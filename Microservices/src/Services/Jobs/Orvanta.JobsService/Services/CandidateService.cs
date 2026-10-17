@@ -174,7 +174,8 @@ public sealed class CandidateService(
         db.Preferences.Add(new JobPreference
         {
             UserId = userId,
-            DesiredTitles = string.IsNullOrWhiteSpace(profile.CurrentTitle) ? [] : [profile.CurrentTitle],
+            // Start with roles derived from the CV title and skills; the user can edit them.
+            DesiredTitles = RoleSuggester.Suggest(profile).ToList(),
             Locations = string.IsNullOrWhiteSpace(profile.Location) ? [] : [profile.Location],
             CompanyBoards = options.Value.DefaultBoards.ToList(),
             MinMatchScore = options.Value.DefaultMatchThreshold

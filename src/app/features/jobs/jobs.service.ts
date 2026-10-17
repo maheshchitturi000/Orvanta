@@ -12,6 +12,7 @@ import {
   JobApplication,
   JobMatch,
   JobPreferences,
+  JobSourceStatus,
   JobsSummary,
   MatchStatus
 } from './jobs.models';
@@ -52,6 +53,19 @@ export class JobsService {
 
   savePreferences(preferences: JobPreferences): Promise<ResponseCls<JobPreferences>> {
     return this.api.put<JobPreferences>('/jobs/preferences', preferences);
+  }
+
+  sources(): Promise<ResponseCls<JobSourceStatus[]>> {
+    return this.api.get<JobSourceStatus[]>('/jobs/sources');
+  }
+
+  /** Validates the key with a test search, then stores it encrypted. */
+  connectSource(name: string, apiKey: string): Promise<ResponseCls<JobSourceStatus>> {
+    return this.api.put<JobSourceStatus>(`/jobs/sources/${name}`, { apiKey });
+  }
+
+  disconnectSource(name: string): Promise<ResponseCls<unknown>> {
+    return this.api.delete(`/jobs/sources/${name}`);
   }
 
   suggestedBoards(): Promise<ResponseCls<string[]>> {

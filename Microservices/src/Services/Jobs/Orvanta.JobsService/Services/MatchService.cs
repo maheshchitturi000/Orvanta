@@ -120,7 +120,7 @@ public sealed class MatchService(JobsDbContext db, IJobQueue queue, DiscoveryWor
                 .Select(n => new NearMissDto(n.Match.Score, n.Job.Company, n.Job.Title, n.Job.Location, n.Job.Source, n.Job.Url, n.Match.Reasons))
                 .ToList();
             var result = new DiscoveryResult(outcome.BoardsScanned, outcome.JobsScanned, outcome.NewMatches, outcome.Errors,
-                outcome.Summary, nearMisses, Hints(preference, outcome));
+                outcome.Summary, nearMisses, Hints(preference, outcome), outcome.RolesUsed, outcome.SearchConnected);
 
             var message = outcome.NewMatches > 0
                 ? $"Found {outcome.NewMatches} new match{(outcome.NewMatches == 1 ? "" : "es")} in {outcome.JobsScanned:N0} jobs."
@@ -143,11 +143,11 @@ public sealed class MatchService(JobsDbContext db, IJobQueue queue, DiscoveryWor
         var hints = new List<SearchHint>();
         if (outcome.NewMatches >= 5) return hints;
 
-        if (preference.DesiredTitles.Count == 0)
-            hints.Add(new("Add your target roles (e.g. .NET Developer, Full Stack Developer). Without them only your CV title is matched.", "profile"));
+        if (!outcome.SearchConnected)
+            hints.Add(new("Connect LinkedIn · Naukri · Indeed to search those job sites too. Right now only a few company career sites are scanned.", "/integrations"));
 
-        if (!discovery.SearchSourcesConfigured)
-            hints.Add(new("LinkedIn, Naukri and Indeed search is off: add your free JSearch API key (see README → Job sources). Right now only company career boards are scanned.", null));
+        if (preference.DesiredTitles.Count == 0 && outcome.RolesUsed.Count > 0)
+            hints.Add(new($"Searched roles from your CV: {string.Join(", ", outcome.RolesUsed)}. Set your own target roles to change this.", "profile"));
 
         // Only suggest lowering the bar for genuine near misses, not jobs held back on purpose
         // (wrong role, missing core skill, far more experience required).

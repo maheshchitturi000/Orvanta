@@ -96,7 +96,18 @@ public sealed record DiscoveryResult(
     IReadOnlyList<string> Errors,
     string Summary,
     IReadOnlyList<NearMissDto> NearMisses,
-    IReadOnlyList<SearchHint> Hints);
+    IReadOnlyList<SearchHint> Hints,
+    IReadOnlyList<string> RolesUsed,
+    bool SearchConnected);
+
+/// <summary>Connection state of a job search source. ServerKey = using the server-wide key, not the user's own.</summary>
+public sealed record SourceStatusDto(string Name, string DisplayName, bool Connected, bool ServerKey, DateTime? ConnectedAtUtc);
+
+public sealed class ConnectSourceRequest
+{
+    [Required(ErrorMessage = "Paste your API key."), StringLength(200, MinimumLength = 10, ErrorMessage = "That doesn't look like an API key.")]
+    public string ApiKey { get; set; } = string.Empty;
+}
 
 public sealed record ApplicationDto(
     Guid Id,

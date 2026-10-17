@@ -96,8 +96,7 @@ public static partial class JobMatcher
         }
 
         // Role
-        var desiredTitles = preference.DesiredTitles.Count > 0 ? preference.DesiredTitles : [profile.CurrentTitle];
-        var roleRatio = RoleMatch(job.Title, desiredTitles);
+        var roleRatio = RoleMatch(job.Title, RoleSuggester.EffectiveRoles(profile, preference));
         reasons.Add(roleRatio >= 0.99 ? "Job title matches a role you want." : roleRatio > 0 ? "Job title partly matches a role you want." : "Job title doesn't match your target roles.");
 
         // Experience

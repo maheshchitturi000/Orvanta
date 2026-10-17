@@ -12,9 +12,13 @@ public sealed record JobSearchQuery(string Role, string? Location, bool RemoteOn
 /// <summary>Search-based source (aggregators). Discovery turns target roles × locations into queries.</summary>
 public interface IJobSearchSource
 {
+    /// <summary>Connection key, e.g. "jsearch".</summary>
     string Name { get; }
-    bool IsConfigured { get; }
-    Task<IReadOnlyList<SourcedJob>> SearchAsync(JobSearchQuery query, CancellationToken ct);
+
+    /// <summary>What users see, e.g. "LinkedIn · Naukri · Indeed".</summary>
+    string DisplayName { get; }
+
+    Task<IReadOnlyList<SourcedJob>> SearchAsync(JobSearchQuery query, string apiKey, CancellationToken ct);
 }
 
 /// <summary>
@@ -27,9 +31,9 @@ public sealed partial class JSearchSource(IHttpClientFactory factory, IOptions<J
 
     public string Name => "jsearch";
 
-    public bool IsConfigured => _options.IsConfigured;
+    public string DisplayName => "LinkedIn · Naukri · Indeed";
 
-    public async Task<IReadOnlyList<SourcedJob>> SearchAsync(JobSearchQuery query, CancellationToken ct)
+    public async Task<IReadOnlyList<SourcedJob>> SearchAsync(JobSearchQuery query, string apiKey, CancellationToken ct)
     {
         var country = query.Location is null ? null : CountryCodes.Resolve(query.Location);
         var text = query.RemoteOnly
@@ -48,7 +52,7 @@ public sealed partial class JSearchSource(IHttpClientFactory factory, IOptions<J
 
         var queryString = string.Join("&", parameters.Select(p => $"{p.Key}={Uri.EscapeDataString(p.Value ?? string.Empty)}"));
         using var request = new HttpRequestMessage(HttpMethod.Get, $"{_options.BaseUrl.TrimEnd('/')}/search?{queryString}");
-        request.Headers.Add("x-rapidapi-key", _options.ApiKey);
+        request.Headers.Add("x-rapidapi-key", apiKey);
         request.Headers.Add("x-rapidapi-host", _options.Host);
 
         using var response = await factory.CreateClient("job-sources").SendAsync(request, ct);

@@ -6,6 +6,17 @@
     <a class="btn btn-primary" routerLink="../profile"><app-icon name="upload" [size]="16" /> Upload CV</a>
   </div>
 } @else {
+  @if (jobSitesConnected() === false) {
+    <div class="connect-banner">
+      <div class="logos" aria-hidden="true"><span class="li">in</span><span class="nk">N</span><span class="id">i</span></div>
+      <div>
+        <strong>Connect LinkedIn · Naukri · Indeed</strong>
+        <small>Right now only a few company career sites are searched. Connect once to find jobs that match your skills on the big job sites.</small>
+      </div>
+      <a class="btn btn-primary btn-sm" routerLink="/integrations" fragment="job-search">Connect</a>
+    </div>
+  }
+
   <div class="toolbar">
     <label class="select-all">
       <input type="checkbox" [checked]="allSelected()" (change)="toggleAll()" [disabled]="!matches().length || busy()" />
@@ -49,7 +60,9 @@
             <li>
               <span>{{ h.message }}</span>
               @if (h.link) {
-                <a class="btn btn-outline btn-sm" [routerLink]="'../' + h.link">Fix</a>
+                <a class="btn btn-outline btn-sm" [routerLink]="h.link.startsWith('/') ? h.link : '../' + h.link">
+                  {{ h.link === '/integrations' ? 'Connect' : 'Edit' }}
+                </a>
               }
             </li>
           }

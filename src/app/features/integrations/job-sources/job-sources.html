@@ -1,0 +1,78 @@
+@if (success()) {
+  <div class="alert success" role="status"><app-icon name="check" [size]="16" /> {{ success() }}</div>
+}
+
+@if (loading()) {
+  <div class="card skeleton"></div>
+}
+
+@for (s of sources(); track s.name) {
+  <article class="card source">
+    <div class="top">
+      <div class="logos" aria-hidden="true">
+        <span class="logo li">in</span>
+        <span class="logo nk">N</span>
+        <span class="logo id">i</span>
+      </div>
+
+      <div class="copy">
+        <div class="title-row">
+          <h3>{{ s.displayName }}</h3>
+          @if (s.connected) {
+            <span class="badge success">● Connected</span>
+          } @else {
+            <span class="badge muted">Not connected</span>
+          }
+        </div>
+        <p>Find jobs on LinkedIn, Naukri, Indeed and Glassdoor that match your CV skills and job title, in any country.</p>
+        @if (s.connected && s.connectedAtUtc) {
+          <small>Connected {{ s.connectedAtUtc | date: 'mediumDate' }}</small>
+        } @else if (s.serverKey) {
+          <small>Using the workspace connection</small>
+        }
+      </div>
+
+      <div class="actions">
+        @if (s.connected && !s.serverKey) {
+          <button type="button" class="btn btn-danger-ghost btn-sm" (click)="disconnect(s)" [disabled]="busy()">Disconnect</button>
+        } @else if (connecting() !== s.name) {
+          <button type="button" class="btn btn-primary btn-sm" (click)="startConnect(s)">
+            Connect <app-icon name="external" [size]="14" />
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (connecting() === s.name) {
+      <div class="connect">
+        <ol class="steps">
+          <li>Open <a href="https://rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch" target="_blank" rel="noopener">JSearch on RapidAPI</a> and sign up (free).</li>
+          <li>Click <b>Subscribe to Test</b> and choose the <b>Basic</b> plan (free, about 200 searches a month).</li>
+          <li>Copy the <b>X-RapidAPI-Key</b> value shown in the code example and paste it below.</li>
+        </ol>
+
+        <div class="field">
+          <label for="apiKey">API key</label>
+          <div class="input-group">
+            <input id="apiKey" class="input" [type]="showKey() ? 'text' : 'password'" autocomplete="off" spellcheck="false"
+                   placeholder="Paste your X-RapidAPI-Key" [ngModel]="apiKey()" (ngModelChange)="apiKey.set($event)"
+                   (keydown.enter)="connect(s)" />
+            <button type="button" class="input-action" (click)="showKey.set(!showKey())">{{ showKey() ? 'Hide' : 'Show' }}</button>
+          </div>
+          <span class="hint"><app-icon name="shield" [size]="12" /> Checked with one test search, then stored encrypted. Only you can use it.</span>
+        </div>
+
+        @if (error()) {
+          <div class="alert error" role="alert"><app-icon name="alert" [size]="16" /> {{ error() }}</div>
+        }
+
+        <div class="connect-actions">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="cancel()" [disabled]="busy()">Cancel</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="connect(s)" [disabled]="busy() || !apiKey().trim()">
+            @if (busy()) { <span class="spinner"></span> Checking key… } @else { Connect }
+          </button>
+        </div>
+      </div>
+    }
+  </article>
+}

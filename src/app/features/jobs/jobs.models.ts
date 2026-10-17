@@ -112,6 +112,17 @@ export interface DiscoveryResult {
   summary: string;
   nearMisses: NearMiss[];
   hints: SearchHint[];
+  rolesUsed: string[];
+  searchConnected: boolean;
+}
+
+export interface JobSourceStatus {
+  name: string;
+  displayName: string;
+  connected: boolean;
+  /** Connected through the server-wide key rather than the user's own. */
+  serverKey: boolean;
+  connectedAtUtc: string | null;
 }
 
 export interface ApproveResult {

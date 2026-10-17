@@ -112,7 +112,7 @@
         <app-chip-input inputId="titles" label="Add role" placeholder="e.g. .NET Developer, Software Engineer"
                         [values]="pr.desiredTitles" [suggestions]="roleSuggestions()" (valuesChange)="patchPrefs('desiredTitles', $event)" />
         @if (!pr.desiredTitles.length) {
-          <span class="hint warn">Add at least one role. Jobs are matched on title first.</span>
+          <span class="hint">Optional. Leave empty and Orvanta uses roles from your CV title and skills (the suggestions above).</span>
         }
       </div>
       <div class="field full">

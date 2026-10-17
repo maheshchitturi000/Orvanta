@@ -40,12 +40,17 @@ export class Matches implements OnInit {
   protected readonly notice = signal('');
   /** Outcome of the last "Search now": hints and closest jobs when matches are few. */
   protected readonly lastSearch = signal<DiscoveryResult | null>(null);
+  /** null = unknown yet; false shows the "Connect LinkedIn · Naukri · Indeed" banner. */
+  protected readonly jobSitesConnected = signal<boolean | null>(null);
 
   protected readonly allSelected = computed(() => this.matches().length > 0 && this.selected().size === this.matches().length);
   protected readonly needsCv = computed(() => this.state.summary()?.hasCv === false);
 
   ngOnInit(): void {
     void this.load();
+    this.api.sources()
+      .then(r => this.jobSitesConnected.set((r.statusObject ?? []).some(s => s.connected)))
+      .catch(() => this.jobSitesConnected.set(null));
   }
 
   async load(): Promise<void> {

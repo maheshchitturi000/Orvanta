@@ -58,7 +58,7 @@ public class JSearchTests
         var handler = new StubHandler(SampleResponse);
         var source = new JSearchSource(new StubFactory(handler), Options(), NullLogger<JSearchSource>.Instance);
 
-        var jobs = await source.SearchAsync(new JobSearchQuery(".NET Developer", "Bengaluru, India", false), default);
+        var jobs = await source.SearchAsync(new JobSearchQuery(".NET Developer", "Bengaluru, India", false), "test-key", default);
 
         var job = Assert.Single(jobs);
         Assert.Equal("linkedin", job.Source);
@@ -78,7 +78,7 @@ public class JSearchTests
     {
         var source = new JSearchSource(new StubFactory(new StubHandler("{}", HttpStatusCode.Forbidden)), Options(), NullLogger<JSearchSource>.Instance);
 
-        var error = await Assert.ThrowsAsync<HttpRequestException>(() => source.SearchAsync(new JobSearchQuery("x", null, false), default));
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() => source.SearchAsync(new JobSearchQuery("x", null, false), "bad-key", default));
         Assert.Contains("API key", error.Message);
     }
 
@@ -99,9 +99,19 @@ public class JSearchTests
         Assert.Equal(expected, CountryCodes.Resolve(place));
 
     [Fact]
+    public void Derives_roles_from_cv_when_none_are_set()
+    {
+        var profile = new CandidateProfile { CurrentTitle = "full stack .net developer", Skills = ["C#", "Angular", "SQL Server"] };
+
+        var roles = Orvanta.Jobs.Core.Matching.RoleSuggester.EffectiveRoles(profile, new JobPreference());
+
+        Assert.Equal(["Full Stack .NET Developer", ".NET Developer", "Full Stack Developer", "Software Engineer"], roles);
+    }
+
+    [Fact]
     public void Builds_queries_across_roles_first_within_quota()
     {
-        var workflow = new DiscoveryWorkflow(null!, new JobSourceRegistry([]), [], new MemoryCache(new MemoryCacheOptions()), Options(maxQueries: 3), NullLogger<DiscoveryWorkflow>.Instance);
+        var workflow = new DiscoveryWorkflow(null!, new JobSourceRegistry([]), [], null!, new MemoryCache(new MemoryCacheOptions()), Options(maxQueries: 3), NullLogger<DiscoveryWorkflow>.Instance);
         var preference = new JobPreference { DesiredTitles = [".NET Developer", "Full Stack Developer"], Locations = ["Bengaluru", "Remote"] };
 
         var queries = workflow.BuildQueries(new CandidateProfile(), preference);

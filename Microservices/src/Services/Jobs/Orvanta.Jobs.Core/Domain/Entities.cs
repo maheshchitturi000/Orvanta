@@ -24,6 +24,15 @@ public sealed class CandidateProfile
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 }
 
+/// <summary>A user's connection to a job search source (e.g. JSearch for LinkedIn/Naukri/Indeed). Secret is AES-GCM encrypted.</summary>
+public sealed class JobSourceConnection
+{
+    public Guid UserId { get; set; }
+    public string Source { get; set; } = string.Empty;
+    public string SecretEncrypted { get; set; } = string.Empty;
+    public DateTime ConnectedAtUtc { get; set; } = DateTime.UtcNow;
+}
+
 /// <summary>What the user is looking for and how the daily automation should run.</summary>
 public sealed class JobPreference
 {
