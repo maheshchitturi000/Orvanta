@@ -62,6 +62,17 @@ CV, with implied skills, so SQL Server counts as SQL), 30% role (job title vs ta
 synonyms), and 15% seniority (required years vs CV). Guards: a different job function (manager, sales,
 solutions…) or a core skill in the title missing from the CV keeps a job below 80.
 
+**Job sources.**
+- *Company career boards* (Greenhouse, Lever, Ashby): free public APIs, scanned in full per board.
+- *JSearch* (Google for Jobs via RapidAPI): searches built from **target roles × locations** return
+  listings published on **LinkedIn, Naukri, Indeed, Glassdoor** and company sites, in any country
+  (locations are mapped to ISO country codes). Each match shows "via LinkedIn" and so on. Free plans have
+  a monthly request quota, so each run makes at most `Jobs:JSearch:MaxQueriesPerRun` searches (default 3)
+  and caches results for 6 hours. Duplicates across sources are removed.
+  Setup: subscribe to JSearch on RapidAPI, then
+  `dotnet user-secrets set "Jobs:JSearch:ApiKey" "<key>" --project src/Services/Jobs/Orvanta.JobsService`.
+  The Functions project shares the same user-secrets store.
+
 **AI is optional.** With Ollama running (`Jobs:Llm`), CVs are parsed and cover letters written by the
 local model. Without it, rule-based parsing and a template letter are used, so nothing breaks.
 

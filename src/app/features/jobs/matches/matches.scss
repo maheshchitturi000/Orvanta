@@ -139,6 +139,30 @@
   .muted {
     color: var(--text-subtle);
   }
+
+  .via {
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: #f3f2f7;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+
+    &[data-source='linkedin'] {
+      background: #e8f1fb;
+      color: #0a66c2;
+    }
+
+    &[data-source='naukri'] {
+      background: #eef3ff;
+      color: #275df5;
+    }
+
+    &[data-source='indeed'] {
+      background: #edf1ff;
+      color: #2557a7;
+    }
+  }
 }
 
 .skills {

@@ -9,11 +9,13 @@ using Orvanta.Jobs.Core.Sources;
 
 namespace Orvanta.Jobs.Core.Workflow;
 
-public sealed record DiscoveryOutcome(int BoardsScanned, int JobsScanned, int NewMatches, IReadOnlyList<string> Errors)
+public sealed record DiscoveryOutcome(int BoardsScanned, int JobsScanned, int NewMatches, IReadOnlyList<string> Errors, int SearchesRun = 0)
 {
     public string Summary =>
-        $"Scanned {JobsScanned} jobs on {BoardsScanned} boards · {NewMatches} new match{(NewMatches == 1 ? "" : "es")}" +
-        (Errors.Count > 0 ? $" · {Errors.Count} board(s) unavailable" : string.Empty);
+        $"Scanned {JobsScanned} jobs on {BoardsScanned} boards" +
+        (SearchesRun > 0 ? $" + {SearchesRun} LinkedIn/Naukri/Indeed search{(SearchesRun == 1 ? "" : "es")}" : string.Empty) +
+        $" · {NewMatches} new match{(NewMatches == 1 ? "" : "es")}" +
+        (Errors.Count > 0 ? $" · {Errors.Count} source(s) unavailable" : string.Empty);
 }
 
 /// <summary>
@@ -23,6 +25,7 @@ public sealed record DiscoveryOutcome(int BoardsScanned, int JobsScanned, int Ne
 public sealed class DiscoveryWorkflow(
     JobsDbContext db,
     JobSourceRegistry sources,
+    IEnumerable<IJobSearchSource> searchSources,
     IMemoryCache cache,
     IOptions<JobsOptions> options,
     ILogger<DiscoveryWorkflow> logger)
@@ -48,29 +51,42 @@ public sealed class DiscoveryWorkflow(
         var threshold = Math.Clamp(preference.MinMatchScore > 0 ? preference.MinMatchScore : _options.DefaultMatchThreshold, 50, 100);
         var oldest = DateTime.UtcNow.AddDays(-Math.Max(preference.MaxPostingAgeDays, 1));
         var errors = new List<string>();
-        var candidates = new List<(SourcedJob Job, MatchResult Match)>();
-        var scanned = 0;
+        var jobs = new List<SourcedJob>();
 
         foreach (var board in boards)
         {
-            var jobs = await FetchBoardAsync(board, errors, ct);
-            scanned += jobs.Count;
+            jobs.AddRange(await FetchBoardAsync(board, errors, ct));
+        }
 
-            foreach (var job in jobs)
+        var queries = BuildQueries(profile, preference);
+        foreach (var search in searchSources.Where(s => s.IsConfigured))
+        {
+            foreach (var query in queries)
             {
-                if (job.PostedAtUtc is { } posted && posted < oldest) continue;
-                if (!JobMatcher.PassesFilters(preference, job)) continue;
+                jobs.AddRange(await SearchAsync(search, query, errors, ct));
+            }
+        }
+        var searchesRun = searchSources.Any(s => s.IsConfigured) ? queries.Count : 0;
 
-                var match = JobMatcher.Score(profile, preference, job);
-                if (match.Score >= threshold)
-                {
-                    candidates.Add((job, match));
-                }
+        // The same job often appears on its company board and on LinkedIn/Indeed; keep the first
+        // (boards come first, and their direct ATS links are the easiest to fill).
+        var unique = jobs.DistinctBy(DuplicateKey).ToList();
+
+        var candidates = new List<(SourcedJob Job, MatchResult Match)>();
+        foreach (var job in unique)
+        {
+            if (job.PostedAtUtc is { } posted && posted < oldest) continue;
+            if (!JobMatcher.PassesFilters(preference, job)) continue;
+
+            var match = JobMatcher.Score(profile, preference, job);
+            if (match.Score >= threshold)
+            {
+                candidates.Add((job, match));
             }
         }
 
         var newMatches = await SaveMatchesAsync(userId, candidates.OrderByDescending(c => c.Match.Score).ToList(), ct);
-        var outcome = new DiscoveryOutcome(boards.Count, scanned, newMatches, errors);
+        var outcome = new DiscoveryOutcome(boards.Count, unique.Count, newMatches, errors, searchesRun);
 
         preference.LastDiscoveryAtUtc = DateTime.UtcNow;
         preference.LastDiscoverySummary = outcome.Summary.Length > 500 ? outcome.Summary[..500] : outcome.Summary;
@@ -79,6 +95,55 @@ public sealed class DiscoveryWorkflow(
         logger.LogInformation("Discovery for {UserId}: {Summary}", userId, outcome.Summary);
         return outcome;
     }
+
+    /// <summary>
+    /// Target roles × locations, most important first, limited by the per-run quota.
+    /// No locations → one query per role; "Remote only" → remote queries.
+    /// </summary>
+    public IReadOnlyList<JobSearchQuery> BuildQueries(CandidateProfile profile, JobPreference preference)
+    {
+        var roles = preference.DesiredTitles.Count > 0
+            ? preference.DesiredTitles
+            : string.IsNullOrWhiteSpace(profile.CurrentTitle) ? [] : [profile.CurrentTitle];
+
+        IEnumerable<JobSearchQuery> queries = preference.RemoteOnly || preference.Locations.Count == 0
+            ? roles.Select(r => new JobSearchQuery(r, null, preference.RemoteOnly))
+            // Interleave so a small quota covers different roles before repeating locations.
+            : preference.Locations.SelectMany((location, li) => roles.Select((role, ri) => (Query: new JobSearchQuery(role, location, false), Order: li * 100 + ri)))
+                .OrderBy(x => x.Order)
+                .Select(x => x.Query);
+
+        return queries.Take(Math.Max(_options.JSearch.MaxQueriesPerRun, 0)).ToList();
+    }
+
+    private async Task<IReadOnlyList<SourcedJob>> SearchAsync(IJobSearchSource source, JobSearchQuery query, List<string> errors, CancellationToken ct)
+    {
+        // Search quotas are small (≈200/month on free plans): reuse results for a few hours.
+        var key = $"search:{source.Name}:{query.Role}|{query.Location}|{query.RemoteOnly}".ToLowerInvariant();
+        if (cache.TryGetValue<IReadOnlyList<SourcedJob>>(key, out var cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        try
+        {
+            var jobs = await source.SearchAsync(query, ct);
+            cache.Set(key, jobs, TimeSpan.FromHours(Math.Max(_options.JSearch.CacheHours, 1)));
+            return jobs;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            logger.LogWarning(ex, "{Source} search \"{Role}\" in {Location} failed", source.Name, query.Role, query.Location);
+            errors.Add($"{source.Name}: {ex.Message}");
+            return [];
+        }
+    }
+
+    private static string DuplicateKey(SourcedJob job) =>
+        string.Join("|", Normalize(job.Company), Normalize(job.Title), Normalize(job.Location.Split(',')[0]));
+
+    private static string Normalize(string value) =>
+        new string(value.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
 
     private async Task<IReadOnlyList<SourcedJob>> FetchBoardAsync(CompanyBoard board, List<string> errors, CancellationToken ct)
     {

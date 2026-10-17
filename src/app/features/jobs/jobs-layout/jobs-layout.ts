@@ -22,7 +22,7 @@ interface Tab {
 export class JobsLayout implements OnInit {
   protected readonly state = inject(JobsState);
 
-  protected readonly tabs: Tab[] = [
+  protected readonly tabs: readonly Tab[] = [
     { label: 'Matches', link: 'matches', icon: 'search', badge: () => this.state.summary()?.newMatches ?? 0 },
     { label: 'Applications', link: 'applications', icon: 'send', badge: () => this.state.summary()?.readyToSubmit ?? 0 },
     { label: 'CV & preferences', link: 'profile', icon: 'user' }

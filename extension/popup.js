@@ -41,6 +41,13 @@ async function refresh() {
     <p><small>Use “Fill this page” on any application form, e.g. a LinkedIn Easy Apply step.</small></p>`);
 
   document.getElementById('start').onclick = async () => {
+    // Jobs found via LinkedIn/Naukri/Indeed can open on any company site. Ask once (must be in this
+    // click handler) so the extension may fill forms there; if declined, known sites still work.
+    try {
+      await chrome.permissions.request({ origins: ['https://*/*'] });
+    } catch {
+      /* ignored */
+    }
     const result = await send('start');
     if (result?.error) render(`<div class="card error">${result.error}</div>`);
     else window.close();

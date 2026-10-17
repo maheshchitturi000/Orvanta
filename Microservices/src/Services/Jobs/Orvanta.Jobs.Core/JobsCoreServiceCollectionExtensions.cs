@@ -31,6 +31,7 @@ public static class JobsCoreServiceCollectionExtensions
         services.AddSingleton<IJobSource, LeverSource>();
         services.AddSingleton<IJobSource, AshbySource>();
         services.AddSingleton<JobSourceRegistry>();
+        services.AddSingleton<IJobSearchSource, JSearchSource>();
 
         services.AddHttpClient<ILlmClient, OllamaLlmClient>(c => c.Timeout = Timeout.InfiniteTimeSpan);
         services.AddScoped<ProfileExtractor>();

@@ -154,6 +154,20 @@ async function taskForTab(tabId) {
   return app ? { application: app, position: run.index + 1, total: run.queue.length } : null;
 }
 
+// Jobs from LinkedIn/Naukri/Indeed can redirect to any company site. When the user granted the
+// optional "all https sites" permission, inject the filler into the run tab wherever it lands.
+chrome.tabs.onUpdated.addListener(async (tabId, change, tab) => {
+  if (change.status !== 'complete' || !/^https:/.test(tab.url || '')) return;
+  const run = await getRun();
+  if (!run || run.tabId !== tabId) return;
+  try {
+    await chrome.scripting.insertCSS({ target: { tabId }, files: ['content.css'] });
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+  } catch {
+    // No permission for this site: the user can still fill it manually and press "I submitted it".
+  }
+});
+
 // ---------- Messages from popup and content script ----------
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

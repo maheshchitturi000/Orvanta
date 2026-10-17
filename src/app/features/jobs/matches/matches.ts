@@ -7,6 +7,17 @@ import { JobsState } from '../jobs-state.service';
 import { JobMatch } from '../jobs.models';
 import { JobsService } from '../jobs.service';
 
+const SOURCE_LABELS: Record<string, string> = {
+  linkedin: 'LinkedIn',
+  naukri: 'Naukri',
+  indeed: 'Indeed',
+  glassdoor: 'Glassdoor',
+  greenhouse: 'company site',
+  lever: 'company site',
+  ashby: 'company site',
+  web: 'web'
+};
+
 /** Today's matches with one-click approval for the background apply workflow. */
 @Component({
   selector: 'app-job-matches',
@@ -104,6 +115,10 @@ export class Matches implements OnInit {
     } finally {
       this.searching.set(false);
     }
+  }
+
+  protected sourceLabel(source: string): string {
+    return SOURCE_LABELS[source] ?? source.charAt(0).toUpperCase() + source.slice(1);
   }
 
   protected scoreClass(score: number): string {

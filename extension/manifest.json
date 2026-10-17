@@ -18,15 +18,19 @@
     "https://boards.greenhouse.io/*",
     "https://jobs.lever.co/*",
     "https://jobs.ashbyhq.com/*",
-    "https://www.linkedin.com/jobs/*"
+    "https://www.linkedin.com/jobs/*",
+    "https://www.naukri.com/*"
   ],
+  "optional_host_permissions": ["https://*/*"],
   "content_scripts": [
     {
       "matches": [
         "https://job-boards.greenhouse.io/*",
         "https://boards.greenhouse.io/*",
         "https://jobs.lever.co/*",
-        "https://jobs.ashbyhq.com/*"
+        "https://jobs.ashbyhq.com/*",
+        "https://www.linkedin.com/jobs/*",
+        "https://www.naukri.com/*"
       ],
       "js": ["content.js"],
       "css": ["content.css"],

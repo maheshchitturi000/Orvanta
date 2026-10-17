@@ -74,6 +74,7 @@
               <h3>{{ m.job.title }}</h3>
               <div class="meta">
                 <span class="company">{{ m.job.company }}</span>
+                <span class="via" [attr.data-source]="m.job.source">via {{ sourceLabel(m.job.source) }}</span>
                 <span><app-icon name="mapPin" [size]="13" /> {{ m.job.location || 'Location not listed' }}</span>
                 @if (m.job.isRemote) { <span class="badge success">Remote</span> }
                 @if (m.job.postedAtUtc) { <span class="muted">Posted {{ m.job.postedAtUtc | date: 'MMM d' }}</span> }

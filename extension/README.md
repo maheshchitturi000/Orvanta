@@ -26,7 +26,13 @@ your LinkedIn and other accounts within each site's rules.
 | Greenhouse (`job-boards.greenhouse.io`, `boards.greenhouse.io`) | ✓ | ✓ |
 | Lever (`jobs.lever.co`) | ✓ | ✓ |
 | Ashby (`jobs.ashbyhq.com`) | ✓ | ✓ |
-| LinkedIn Easy Apply | via **Fill this page** | best effort, step by step |
+| LinkedIn job pages (Easy Apply) | ✓ | fills each step as it appears; you press Next / Submit |
+| Naukri | ✓ | ✓ (best effort) |
+| Any other company site | ✓ after you allow "all https sites" when starting | ✓ (label-based) |
+
+When you click **Start applying**, Chrome asks once whether Orvanta may read and change data on https
+sites. This is needed because jobs found via LinkedIn, Naukri or Indeed often redirect to the company's
+own careers site. If you decline, the sites listed above still work.
 
 ## How it talks to Orvanta
 

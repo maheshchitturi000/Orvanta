@@ -14,6 +14,33 @@ public sealed class JobsOptions
     public List<string> DefaultBoards { get; set; } = [];
 
     public LlmOptions Llm { get; set; } = new();
+
+    public JSearchOptions JSearch { get; set; } = new();
+}
+
+/// <summary>
+/// JSearch (Google for Jobs data via RapidAPI): listings published on LinkedIn, Naukri, Indeed,
+/// Glassdoor and company sites, in any country. Key goes in user-secrets: Jobs:JSearch:ApiKey.
+/// </summary>
+public sealed class JSearchOptions
+{
+    public bool Enabled { get; set; } = true;
+    public string ApiKey { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = "https://jsearch.p.rapidapi.com";
+    public string Host { get; set; } = "jsearch.p.rapidapi.com";
+
+    /// <summary>Searches per discovery run (role × location). Each costs one API request.</summary>
+    public int MaxQueriesPerRun { get; set; } = 3;
+
+    /// <summary>Pages of 10 results per search.</summary>
+    public int PagesPerQuery { get; set; } = 1;
+
+    /// <summary>all | today | 3days | week | month</summary>
+    public string DatePosted { get; set; } = "week";
+
+    public int CacheHours { get; set; } = 6;
+
+    public bool IsConfigured => Enabled && !string.IsNullOrWhiteSpace(ApiKey);
 }
 
 public sealed class LlmOptions

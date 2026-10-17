@@ -134,35 +134,60 @@
     const { application, position, total } = task;
 
     if (CONFIRMATION.test(document.body.innerText)) {
-      banner(`<b>Submitted ✓</b> ${application.job.title} at ${application.job.company}. Moving to the next job…`);
+      banner(`<b>Submitted ✓</b> ${escapeHtml(application.job.title)} at ${escapeHtml(application.job.company)}. Moving to the next job…`);
       await chrome.runtime.sendMessage({ type: 'submitted' });
       return;
     }
 
     // Forms render client-side on some boards; give them a moment.
     await new Promise(resolve => setTimeout(resolve, 1200));
-    const filled = fill(application.answers, application.coverLetter);
+    let total_filled = fill(application.answers, application.coverLetter);
     const cv = await attachCv();
 
-    banner(
-      `<b>Job ${position} of ${total}:</b> ${application.job.title} at ${application.job.company}<br>` +
-      `Filled ${filled} field${filled === 1 ? '' : 's'}${cv ? ' and attached your CV' : ''}. ` +
-      `Answer anything left, review, then press the site's <b>Submit</b> button.`,
+    const isLinkedIn = location.hostname.endsWith('linkedin.com');
+    const render = () => banner(
+      `<b>Job ${position} of ${total}:</b> ${escapeHtml(application.job.title)} at ${escapeHtml(application.job.company)}<br>` +
+      (isLinkedIn && total_filled === 0
+        ? 'Click <b>Easy Apply</b> (or <b>Apply</b>). Orvanta fills each step as it appears; you press <b>Next</b> / <b>Submit</b>.'
+        : `Filled ${total_filled} field${total_filled === 1 ? '' : 's'}${cv ? ' and attached your CV' : ''}. ` +
+          `Answer anything left, review, then press the site's <b>Submit</b> button.`),
       [
         { label: 'I submitted it', primary: true, onClick: () => chrome.runtime.sendMessage({ type: 'submitted' }) },
-        { label: 'Skip this job', onClick: () => chrome.runtime.sendMessage({ type: 'skip' }) }
+        { label: 'Fill again', onClick: async () => { total_filled += fill(application.answers, application.coverLetter); await attachCv(); render(); } },
+        { label: 'Skip', onClick: () => chrome.runtime.sendMessage({ type: 'skip' }) }
       ]
     );
+    render();
 
-    // Detect single-page confirmations (no navigation after submit).
+    // Multi-step forms (LinkedIn Easy Apply, Workday...) add fields as you go: fill each new step,
+    // and detect single-page confirmations after the user submits.
+    let pending = null;
+    let reported = false;
     const observer = new MutationObserver(() => {
-      if (CONFIRMATION.test(document.body.innerText)) {
+      if (!reported && CONFIRMATION.test(document.body.innerText)) {
+        reported = true;
         observer.disconnect();
-        banner(`<b>Submitted ✓</b> Moving to the next job…`);
+        banner('<b>Submitted ✓</b> Moving to the next job…');
         chrome.runtime.sendMessage({ type: 'submitted' });
+        return;
       }
+      clearTimeout(pending);
+      pending = setTimeout(async () => {
+        const added = fill(application.answers, application.coverLetter);
+        const attached = await attachCv();
+        if (added > 0 || attached) {
+          total_filled += added;
+          render();
+        }
+      }, 700);
     });
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text ?? '';
+    return div.innerHTML;
   }
 
   // "Fill this page" from the popup (any form, e.g. LinkedIn Easy Apply).
