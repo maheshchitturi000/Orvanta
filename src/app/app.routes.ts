@@ -1,8 +1,23 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/auth/auth.guards';
+import { AppShell } from './core/layout/app-shell/app-shell';
+import { PageMeta } from './core/layout/topbar/topbar';
+
+const assistant: PageMeta = {
+  title: 'AI Assistant',
+  subtitle: 'Ask anything, or order food from Swiggy and Zomato',
+  icon: 'sparkles'
+};
+
+const integrations: PageMeta = {
+  title: 'Integrations',
+  subtitle: 'Connect the apps Orvanta can use on your behalf',
+  icon: 'apps',
+  hideConnect: true
+};
 
 export const routes: Routes = [
-  // Public: account access
+  // Public: account access (full-screen auth layout)
   {
     path: 'login',
     canActivate: [guestGuard],
@@ -22,18 +37,31 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/verify-email/verify-email').then(m => m.VerifyEmail)
   },
 
-  // Signed-in only
+  // Signed-in: every page renders inside the shared shell (sidebar + top navbar)
   {
     path: '',
+    component: AppShell,
     canActivate: [authGuard],
-    title: 'Orvanta AI',
-    loadComponent: () => import('./features/chat/chat').then(m => m.Chat)
-  },
-  {
-    path: 'integrations',
-    canActivate: [authGuard],
-    title: 'Integrations · Orvanta AI',
-    loadComponent: () => import('./features/integrations/integrations').then(m => m.Integrations)
+    children: [
+      {
+        path: '',
+        title: 'Orvanta AI',
+        data: assistant,
+        loadComponent: () => import('./features/chat/chat').then(m => m.Chat)
+      },
+      {
+        path: 'c/:conversationId',
+        title: 'Conversation · Orvanta AI',
+        data: assistant,
+        loadComponent: () => import('./features/chat/chat').then(m => m.Chat)
+      },
+      {
+        path: 'integrations',
+        title: 'Integrations · Orvanta AI',
+        data: integrations,
+        loadComponent: () => import('./features/integrations/integrations').then(m => m.Integrations)
+      }
+    ]
   },
 
   { path: '**', redirectTo: '' }

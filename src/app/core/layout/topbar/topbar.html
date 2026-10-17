@@ -1,0 +1,26 @@
+<button type="button" class="icon-btn menu" (click)="openMenu()" aria-label="Open menu">
+  <app-icon name="menu" [size]="20" />
+</button>
+
+<div class="title">
+  @if (page().icon; as icon) {
+    <span class="title-icon"><app-icon [name]="icon" [size]="18" /></span>
+  }
+  <div class="title-text">
+    <h1>{{ page().title }}</h1>
+    @if (page().subtitle) {
+      <p>{{ page().subtitle }}</p>
+    }
+  </div>
+</div>
+
+<div class="actions">
+  <span class="status" title="AI model running locally via Ollama">
+    <span class="dot"></span> Qwen3 · Local
+  </span>
+  @if (!page().hideConnect) {
+    <a class="btn btn-outline btn-sm" routerLink="/integrations">
+      <app-icon name="apps" [size]="15" /> Connect apps
+    </a>
+  }
+</div>

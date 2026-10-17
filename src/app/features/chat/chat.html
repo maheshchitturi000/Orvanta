@@ -1,102 +1,66 @@
-<div class="shell" [class.sidebar-open]="sidebarOpen()">
-  <aside class="sidebar">
-    <div class="brand">
-      <span class="brand-mark">O</span>
-      <span class="brand-name">orvanta<span>.ai</span></span>
-    </div>
+<section class="conversation" #scroller>
+  <div class="thread">
+    @if (isEmpty()) {
+      <div class="welcome">
+        <span class="welcome-mark"><app-icon name="sparkles" [size]="26" /></span>
+        <h2>Hi {{ firstName() }}, what can I do for you<span>?</span></h2>
+        <p>Ask a question, or tell me what you’re craving. I’ll compare Swiggy and Zomato, show the top 5 dishes and order with cash on delivery once you confirm.</p>
 
-    <button type="button" class="btn btn-primary btn-block" (click)="newConversation()">＋ New conversation</button>
+        <div class="suggestions">
+          @for (s of suggestions; track s.prompt) {
+            <button type="button" class="suggestion" (click)="useSuggestion(s)">
+              <span class="suggestion-icon"><app-icon [name]="s.icon" [size]="16" /></span>
+              <span>{{ s.title }}</span>
+            </button>
+          }
+        </div>
+      </div>
+    }
 
-    <nav class="nav">
-      <span class="nav-label">Workspace</span>
-      <button type="button" class="nav-item active"><span aria-hidden="true">✦</span> AI Assistant</button>
-      <a class="nav-item" routerLink="/integrations"><span aria-hidden="true">⌘</span> Integrations</a>
-    </nav>
-
-    <div class="history">
-      <span class="nav-label">Recent conversations</span>
-      @if (historyLoading() && !conversations().length) {
-        <p class="muted">Loading…</p>
-      } @else if (historyError()) {
-        <p class="muted">{{ historyError() }}</p>
-      } @else if (!conversations().length) {
-        <p class="muted">No saved conversations yet.</p>
-      } @else {
-        @for (c of conversations(); track c.conversationId) {
-          <button type="button" class="history-item" [class.active]="c.conversationId === conversationId()"
-                  (click)="openConversation(c)" [title]="c.title">
-            {{ c.title }}
-          </button>
-        }
+    @if (loadingHistory()) {
+      @for (i of [1, 2, 3]; track i) {
+        <div class="message skeleton" [class.mine]="i === 2">
+          <span class="avatar"></span>
+          <span class="bubble"></span>
+        </div>
       }
+    }
+
+    @for (m of messages(); track $index) {
+      <article class="message" [class.mine]="m.role === 'user'">
+        <span class="avatar" [class.bot]="m.role === 'assistant'">{{ m.role === 'user' ? initials() : 'O' }}</span>
+        <div class="bubble" [class.wide]="!!m.food">
+          <p>{{ m.content }}</p>
+          @if (m.food) {
+            <app-food-results [result]="m.food" (ordered)="onOrdered($event)" />
+          }
+        </div>
+      </article>
+    }
+
+    @if (sending()) {
+      <article class="message">
+        <span class="avatar bot">O</span>
+        <div class="bubble typing" aria-label="Orvanta is thinking"><span></span><span></span><span></span></div>
+      </article>
+    }
+  </div>
+</section>
+
+<footer class="composer-area">
+  @if (error()) {
+    <div class="alert error" role="alert">
+      <app-icon name="alert" [size]="16" /> {{ error() }}
     </div>
+  }
 
-    <div class="account">
-      <span class="avatar">{{ initials() }}</span>
-      <div class="who">
-        <strong>{{ user()?.fullName }}</strong>
-        <small>{{ user()?.email }}</small>
-      </div>
-      <button type="button" class="btn btn-ghost btn-sm" (click)="signOut()" title="Sign out">Sign out</button>
-    </div>
-  </aside>
-
-  <div class="backdrop" (click)="sidebarOpen.set(false)"></div>
-
-  <main class="main">
-    <header class="topbar">
-      <button type="button" class="menu btn btn-ghost btn-sm" (click)="sidebarOpen.set(true)" aria-label="Open menu">☰</button>
-      <div class="title"><span class="live"></span> Orvanta AI</div>
-      <button type="button" class="btn btn-outline btn-sm" (click)="openIntegrations()">Connect apps</button>
-    </header>
-
-    <section class="conversation" #scroller>
-      <div class="thread">
-        @if (messages().length === 1 && !conversationId()) {
-          <div class="welcome">
-            <span class="eyebrow">Your personal AI workspace</span>
-            <h1>Hi {{ firstName() }}, what can I do for you<span>?</span></h1>
-            <p>Ask a question, or say what you’re craving. I’ll compare Swiggy and Zomato and order for you with cash on delivery.</p>
-            <div class="chips">
-              @for (s of suggestions; track s) {
-                <button type="button" class="chip" (click)="useSuggestion(s)">{{ s }}</button>
-              }
-            </div>
-          </div>
-        }
-
-        @for (m of messages(); track $index) {
-          <div class="message" [class.mine]="m.role === 'user'">
-            <span class="avatar" [class.bot]="m.role === 'assistant'">{{ m.role === 'user' ? initials() : 'O' }}</span>
-            <div class="bubble">
-              <p>{{ m.content }}</p>
-              @if (m.food) {
-                <app-food-results [result]="m.food" (ordered)="onOrdered($event)" />
-              }
-            </div>
-          </div>
-        }
-
-        @if (loading()) {
-          <div class="message">
-            <span class="avatar bot">O</span>
-            <div class="bubble typing"><span></span><span></span><span></span></div>
-          </div>
-        }
-      </div>
-    </section>
-
-    <footer class="composer-area">
-      @if (error()) {
-        <div class="alert error" role="alert">{{ error() }}</div>
-      }
-      <div class="composer">
-        <textarea rows="1" placeholder="Message Orvanta AI… e.g. “order paneer biryani”"
-                  [ngModel]="input()" (ngModelChange)="input.set($event)"
-                  (keydown)="onMessageKeydown($event)" [disabled]="loading()"></textarea>
-        <button type="button" class="send" (click)="sendMessage()" [disabled]="loading() || !input().trim()" aria-label="Send">↑</button>
-      </div>
-      <p class="note">Enter to send · Shift + Enter for a new line · Orvanta can make mistakes; you always confirm orders.</p>
-    </footer>
-  </main>
-</div>
+  <div class="composer">
+    <textarea rows="1" placeholder="Message Orvanta AI… e.g. “order paneer biryani”" aria-label="Message"
+              [ngModel]="input()" (ngModelChange)="input.set($event)"
+              (keydown)="onKeydown($event)" [disabled]="sending()"></textarea>
+    <button type="button" class="send" (click)="send()" [disabled]="sending() || !input().trim()" aria-label="Send message">
+      <app-icon name="arrowUp" [size]="18" [strokeWidth]="2.5" />
+    </button>
+  </div>
+  <p class="note">Enter to send · Shift + Enter for a new line · You always review the bill before anything is ordered.</p>
+</footer>

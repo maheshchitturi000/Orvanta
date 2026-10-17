@@ -1,0 +1,64 @@
+<div class="sidebar-head">
+  <a class="brand" routerLink="/" (click)="close()">
+    <span class="brand-mark">O</span>
+    <span class="brand-name">orvanta<span>.ai</span></span>
+  </a>
+  <button type="button" class="icon-btn close" (click)="close()" aria-label="Close menu">
+    <app-icon name="close" />
+  </button>
+</div>
+
+<button type="button" class="btn btn-primary btn-block new-chat" (click)="newConversation()">
+  <app-icon name="plus" [size]="16" /> New conversation
+</button>
+
+<nav class="nav" aria-label="Main">
+  <span class="section-label">Workspace</span>
+  @for (item of nav; track item.link) {
+    <a class="nav-item" [routerLink]="item.link" [class.active]="isActive(item)"
+       [attr.aria-current]="isActive(item) ? 'page' : null" (click)="close()">
+      <app-icon [name]="item.icon" />
+      <span>{{ item.label }}</span>
+    </a>
+  }
+</nav>
+
+<section class="history" aria-label="Recent conversations">
+  <div class="section-row">
+    <span class="section-label">Recent</span>
+    <button type="button" class="icon-btn" (click)="store.refresh()" [disabled]="store.loading()" aria-label="Refresh conversations">
+      <app-icon name="refresh" [size]="14" />
+    </button>
+  </div>
+
+  <div class="history-list">
+    @if (store.loading() && !store.conversations().length) {
+      @for (i of [1, 2, 3]; track i) {
+        <span class="skeleton-line"></span>
+      }
+    } @else if (store.error()) {
+      <p class="muted">{{ store.error() }}</p>
+    } @else if (!store.conversations().length) {
+      <p class="muted">Your conversations will appear here.</p>
+    } @else {
+      @for (c of store.conversations(); track c.conversationId) {
+        <button type="button" class="history-item" [class.active]="c.conversationId === store.activeId()"
+                (click)="openConversation(c.conversationId)" [title]="c.title">
+          <app-icon name="message" [size]="15" />
+          <span>{{ c.title }}</span>
+        </button>
+      }
+    }
+  </div>
+</section>
+
+<footer class="account">
+  <span class="avatar">{{ initials() }}</span>
+  <div class="who">
+    <strong>{{ user()?.fullName }}</strong>
+    <small>{{ user()?.email }}</small>
+  </div>
+  <button type="button" class="icon-btn" (click)="signOut()" aria-label="Sign out" title="Sign out">
+    <app-icon name="logout" />
+  </button>
+</footer>

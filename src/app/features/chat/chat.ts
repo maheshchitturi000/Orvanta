@@ -1,12 +1,25 @@
-import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { Location } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  untracked,
+  viewChild
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { ApiError } from '../../core/models/response-cls.model';
+import { Icon, IconName } from '../../shared/ui/icon/icon';
 import { FoodResults } from '../food/food-results/food-results';
 import { FoodAssistResult, OrderConfirmation } from '../food/food.models';
 import { FoodService } from '../food/food.service';
-import { ConversationService, Conversation } from './conversation.service';
+import { ConversationService } from './conversation.service';
+import { ConversationStore } from './conversation.store';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -14,181 +27,192 @@ interface ChatMessage {
   food?: FoodAssistResult;
 }
 
-const WELCOME: ChatMessage = {
-  role: 'assistant',
-  content: 'Hello! I am Orvanta AI. Ask me anything, or tell me what you feel like eating and I’ll find the top 5 dishes on Swiggy and Zomato.'
-};
+interface Suggestion {
+  icon: IconName;
+  title: string;
+  prompt: string;
+}
 
+/**
+ * Chat page. Route "/" starts a new conversation, "/c/:conversationId" opens one.
+ * Food requests go to the FoodService; everything else goes to the AI model.
+ */
 @Component({
   selector: 'app-chat',
-  imports: [FormsModule, RouterLink, FoodResults],
+  imports: [FormsModule, FoodResults, Icon],
   templateUrl: './chat.html',
-  styleUrl: './chat.scss'
+  styleUrl: './chat.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class Chat implements OnInit {
+export class Chat {
   private readonly auth = inject(AuthService);
-  private readonly conversationsApi = inject(ConversationService);
+  private readonly api = inject(ConversationService);
+  private readonly store = inject(ConversationStore);
   private readonly food = inject(FoodService);
-  private readonly router = inject(Router);
+  private readonly location = inject(Location);
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
-  readonly user = this.auth.user;
-  readonly firstName = this.auth.firstName;
-  readonly initials = computed(() =>
-    (this.user()?.fullName ?? '?')
+  /** Bound from the route parameter (withComponentInputBinding). */
+  readonly conversationId = input<string | undefined>();
+
+  protected readonly firstName = this.auth.firstName;
+  protected readonly initials = computed(() =>
+    (this.auth.user()?.fullName ?? '?')
       .split(' ')
       .filter(Boolean)
       .slice(0, 2)
-      .map(p => p[0]!.toUpperCase())
+      .map(part => part[0]!.toUpperCase())
       .join('')
   );
 
-  readonly messages = signal<ChatMessage[]>([WELCOME]);
-  readonly conversations = signal<Conversation[]>([]);
-  readonly conversationId = signal<string | null>(null);
-  readonly input = signal('');
-  readonly loading = signal(false);
-  readonly historyLoading = signal(false);
-  readonly historyError = signal('');
-  readonly error = signal('');
-  readonly sidebarOpen = signal(false);
+  protected readonly messages = signal<ChatMessage[]>([]);
+  protected readonly input = signal('');
+  protected readonly sending = signal(false);
+  protected readonly loadingHistory = signal(false);
+  protected readonly error = signal('');
+  protected readonly isEmpty = computed(() => this.messages().length === 0 && !this.loadingHistory());
 
-  readonly suggestions = [
-    'Order chicken biryani',
-    'Veg pizza from Swiggy',
-    'Order the top one masala dosa',
-    'Plan my weekend in Goa'
+  protected readonly suggestions: Suggestion[] = [
+    { icon: 'food', title: 'Order chicken biryani', prompt: 'Order chicken biryani' },
+    { icon: 'food', title: 'Veg pizza from Swiggy', prompt: 'Veg pizza from Swiggy' },
+    { icon: 'sparkles', title: 'Order the top masala dosa', prompt: 'Order the top one masala dosa' },
+    { icon: 'message', title: 'Plan a weekend in Goa', prompt: 'Plan my weekend in Goa' }
   ];
 
-  ngOnInit(): void {
-    void this.loadConversations();
+  /** Id of the conversation being shown (from the route, or created on first message). */
+  private currentId: string | null = null;
+
+  constructor() {
+    // Load whenever the routed conversation changes.
+    effect(() => {
+      const id = this.conversationId() ?? null;
+      untracked(() => (id ? void this.open(id) : this.reset()));
+    });
+
+    // "New conversation" from the sidebar while already on this page.
+    let lastToken = this.store.resetToken();
+    effect(() => {
+      const token = this.store.resetToken();
+      if (token !== lastToken) {
+        lastToken = token;
+        untracked(() => {
+          this.reset();
+          this.location.replaceState('/');
+        });
+      }
+    });
   }
 
-  onMessageKeydown(event: KeyboardEvent): void {
+  protected onKeydown(event: KeyboardEvent): void {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      void this.sendMessage();
+      void this.send();
     }
   }
 
-  useSuggestion(text: string): void {
-    this.input.set(text);
-    void this.sendMessage();
+  protected useSuggestion(suggestion: Suggestion): void {
+    this.input.set(suggestion.prompt);
+    void this.send();
   }
 
-  async loadConversations(): Promise<void> {
-    this.historyLoading.set(true);
-    this.historyError.set('');
-    try {
-      this.conversations.set(await this.conversationsApi.list());
-    } catch {
-      this.historyError.set('Recent conversations are unavailable.');
-    } finally {
-      this.historyLoading.set(false);
-    }
-  }
+  protected async send(): Promise<void> {
+    const text = this.input().trim();
+    if (!text || this.sending()) return;
 
-  newConversation(): void {
-    if (this.loading()) return;
-    this.conversationId.set(null);
     this.input.set('');
     this.error.set('');
-    this.messages.set([WELCOME]);
-    this.sidebarOpen.set(false);
+    this.sending.set(true);
+    this.append({ role: 'user', content: text });
+
+    const conversationId = await this.ensureConversation(text);
+    void this.persist(conversationId, 'user', text);
+
+    try {
+      const food = await this.tryFood(text);
+      if (food) {
+        this.append({ role: 'assistant', content: food.message, food: food.result });
+        void this.persist(conversationId, 'assistant', this.summarise(food.message, food.result));
+        return;
+      }
+
+      const reply = await this.api.chat(text);
+      this.append({ role: 'assistant', content: reply });
+      void this.persist(conversationId, 'assistant', reply);
+    } catch (error) {
+      this.error.set(ApiError.from(error).message);
+    } finally {
+      this.sending.set(false);
+      void this.store.refresh();
+    }
   }
 
-  async openConversation(conversation: Conversation): Promise<void> {
-    if (this.loading()) return;
+  protected onOrdered(order: OrderConfirmation): void {
+    const text = `Order placed: ${order.itemName} × ${order.quantity} from ${order.restaurantName} (${order.provider}). Pay ₹${order.totalAmount} cash on delivery.`;
+    void this.persist(this.currentId, 'assistant', text);
+  }
 
-    this.conversationId.set(conversation.conversationId);
-    this.loading.set(true);
+  private async open(conversationId: string): Promise<void> {
+    this.currentId = conversationId;
+    this.store.setActive(conversationId);
     this.error.set('');
-    this.sidebarOpen.set(false);
+    this.loadingHistory.set(true);
+    this.messages.set([]);
+
     try {
-      const saved = await this.conversationsApi.messages(conversation.conversationId);
+      const saved = await this.api.messages(conversationId);
+      if (this.currentId !== conversationId) return; // user moved on meanwhile
       this.messages.set(
         saved
           .filter(m => m.role === 'user' || m.role === 'assistant')
           .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
       );
-      this.scrollToBottom();
+      this.scrollToBottom('auto');
     } catch {
       this.error.set('Could not open this conversation.');
     } finally {
-      this.loading.set(false);
+      this.loadingHistory.set(false);
     }
   }
 
-  async sendMessage(): Promise<void> {
-    const message = this.input().trim();
-    if (!message || this.loading()) return;
-
+  private reset(): void {
+    this.currentId = null;
+    this.store.setActive(null);
+    this.messages.set([]);
     this.input.set('');
-    this.loading.set(true);
     this.error.set('');
-    this.messages.update(list => [...list, { role: 'user', content: message }]);
+  }
+
+  private append(message: ChatMessage): void {
+    this.messages.update(list => [...list, message]);
     this.scrollToBottom();
+  }
 
-    const conversationId = await this.ensureConversation(message);
-    void this.persist(conversationId, 'user', message);
-
+  private async tryFood(text: string): Promise<{ message: string; result: FoodAssistResult } | null> {
     try {
-      // Food requests are handled by the FoodService; everything else goes to the AI model.
-      const food = await this.tryFood(message);
-      if (food) {
-        const summary = this.summarise(food.statusMessage, food.result);
-        this.messages.update(list => [...list, { role: 'assistant', content: food.statusMessage, food: food.result }]);
-        void this.persist(conversationId, 'assistant', summary);
-        return;
-      }
-
-      const reply = await this.conversationsApi.chat(message);
-      this.messages.update(list => [...list, { role: 'assistant', content: reply }]);
-      void this.persist(conversationId, 'assistant', reply);
+      const response = await this.food.assist(text);
+      return response.statusObject?.isFoodIntent ? { message: response.statusMessage, result: response.statusObject } : null;
     } catch (error) {
-      this.error.set(ApiError.from(error).message);
-    } finally {
-      this.loading.set(false);
-      this.scrollToBottom();
-      void this.loadConversations();
-    }
-  }
-
-  onOrdered(order: OrderConfirmation): void {
-    const text = `Order placed: ${order.itemName} × ${order.quantity} from ${order.restaurantName} (${order.provider}). Pay ₹${order.totalAmount} cash on delivery.`;
-    void this.persist(this.conversationId(), 'assistant', text);
-  }
-
-  async signOut(): Promise<void> {
-    await this.auth.logout();
-  }
-
-  openIntegrations(): void {
-    void this.router.navigate(['/integrations']);
-  }
-
-  private async tryFood(message: string): Promise<{ statusMessage: string; result: FoodAssistResult } | null> {
-    try {
-      const response = await this.food.assist(message);
-      const result = response.statusObject;
-      return result?.isFoodIntent ? { statusMessage: response.statusMessage, result } : null;
-    } catch (error) {
-      // If the food service is down, fall back to normal chat rather than failing the message.
+      // If the food service is unavailable, fall back to the normal AI reply.
       console.warn('Food assist unavailable', error);
       return null;
     }
   }
 
   private summarise(heading: string, result: FoodAssistResult): string {
-    const lines = result.items.map(r => `${r.rank}. ${r.item.name} – ${r.item.restaurantName} (${r.item.providerName})${r.item.price !== null ? ` ₹${r.item.price}` : ''}`);
+    const lines = result.items.map(
+      r => `${r.rank}. ${r.item.name} – ${r.item.restaurantName} (${r.item.providerName})${r.item.price !== null ? ` ₹${r.item.price}` : ''}`
+    );
     return [heading, ...lines].join('\n');
   }
 
+  /** Creates the conversation on the first message and reflects it in the URL without reloading the page. */
   private async ensureConversation(firstMessage: string): Promise<string | null> {
-    if (this.conversationId()) return this.conversationId();
+    if (this.currentId) return this.currentId;
     try {
-      const created = await this.conversationsApi.create(firstMessage.substring(0, 200));
-      this.conversationId.set(created.conversationId);
+      const created = await this.api.create(firstMessage.substring(0, 200));
+      this.currentId = created.conversationId;
+      this.store.setActive(created.conversationId);
+      this.location.replaceState(`/c/${created.conversationId}`);
       return created.conversationId;
     } catch {
       return null; // History is optional; chatting still works.
@@ -198,16 +222,16 @@ export class Chat implements OnInit {
   private async persist(conversationId: string | null, role: 'user' | 'assistant', content: string): Promise<void> {
     if (!conversationId) return;
     try {
-      await this.conversationsApi.saveMessage(conversationId, role, content);
+      await this.api.saveMessage(conversationId, role, content);
     } catch (error) {
       console.warn('Could not save message', error);
     }
   }
 
-  private scrollToBottom(): void {
+  private scrollToBottom(behavior: ScrollBehavior = 'smooth'): void {
     setTimeout(() => {
       const el = this.scroller()?.nativeElement;
-      el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      el?.scrollTo({ top: el.scrollHeight, behavior });
     });
   }
 }
