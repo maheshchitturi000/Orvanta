@@ -25,6 +25,8 @@ public static partial class JobMatcher
     private const int ExperienceWeight = 15;
     private const int NoRoleCap = 60;
     private const int MissingCoreSkillCap = 70;
+    private const int ExperienceGapCap = 70;
+    private const decimal MaxToleratedExperienceGap = 2;
     private const int MinSkillsConsidered = 4;
     private const int MaxSkillsConsidered = 10;
 
@@ -119,6 +121,12 @@ public static partial class JobMatcher
         if (missingCore.Count > 0)
         {
             score = Math.Min(score, MissingCoreSkillCap);
+        }
+
+        // Applying to a role asking for far more experience wastes the application.
+        if (required is not null && required.Value - profile.TotalYearsExperience > MaxToleratedExperienceGap)
+        {
+            score = Math.Min(score, ExperienceGapCap);
         }
 
         return new MatchResult(Math.Clamp(score, 0, 100), matched, missing, reasons);

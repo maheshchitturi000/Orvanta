@@ -133,6 +133,18 @@ public class JobMatcherTests
     }
 
     [Fact]
+    public void Large_experience_gap_keeps_job_below_threshold()
+    {
+        var junior = new CandidateProfile { TotalYearsExperience = 3, Skills = Profile.Skills };
+        var job = Job("Senior .NET Developer",
+            "8+ years with C#, ASP.NET Core, Azure, SQL Server, Docker, microservices and Angular.");
+
+        var result = JobMatcher.Score(junior, Preference, job);
+
+        Assert.True(result.Score <= 70, $"score was {result.Score}");
+    }
+
+    [Fact]
     public void Listing_with_few_skills_cannot_reach_full_skill_score()
     {
         var job = Job(".NET Developer", "Join us. Azure experience welcome.");
