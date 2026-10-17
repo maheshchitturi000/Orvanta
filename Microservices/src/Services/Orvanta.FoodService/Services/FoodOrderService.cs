@@ -20,6 +20,14 @@ public sealed class OrderPreviewRequest
     [Range(1, 10, ErrorMessage = "Quantity must be between 1 and 10.")] public int Quantity { get; set; } = 1;
     public bool RequiresCustomization { get; set; }
 
+    /// <summary>Variant format returned by search ("variants" / "variantsV2"), echoed back unchanged.</summary>
+    [RegularExpression("^(variants|variantsV2)$")]
+    public string? VariantFormat { get; set; }
+
+    /// <summary>The default option per variant group, as returned by search.</summary>
+    [MaxLength(10)]
+    public List<VariantChoice>? Variants { get; set; }
+
     /// <summary>Optional: overrides the user's default address for this provider.</summary>
     public string? AddressId { get; set; }
 }
@@ -66,7 +74,7 @@ public sealed class FoodOrderService(
         if (request.RequiresCustomization)
         {
             return ServiceResult<OrderPreview>.Fail(422,
-                $"{request.ItemName} needs size or add-on choices. Please pick another item or order it in the {provider.Key} app.");
+                $"{request.ItemName} has add-ons the restaurant requires you to choose. Please pick another item or order it in the {provider.Key} app.");
         }
 
         return await Guard(async () =>
@@ -78,7 +86,8 @@ public sealed class FoodOrderService(
             }
 
             var cart = await connections.WithSessionAsync(userId, provider.Key, s => provider.PrepareCartAsync(s,
-                new CartRequest(request.RestaurantId, request.RestaurantName, request.MenuItemId, request.Quantity, addressId), ct), ct);
+                new CartRequest(request.RestaurantId, request.RestaurantName, request.MenuItemId, request.Quantity, addressId,
+                    request.VariantFormat, request.Variants), ct), ct);
 
             var previewId = Guid.NewGuid();
             cache.Set(CacheKey(previewId), new StoredPreview(userId, request, cart), PreviewLifetime);

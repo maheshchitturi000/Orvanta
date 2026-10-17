@@ -62,7 +62,10 @@ if (app.Environment.IsDevelopment())
     // Development convenience. For production, generate EF Core migrations
     // (dotnet ef migrations add Initial) and apply them in your release pipeline.
     using var scope = app.Services.CreateScope();
-    await scope.ServiceProvider.GetRequiredService<AuthDbContext>().Database.EnsureCreatedAsync();
+    var database = scope.ServiceProvider.GetRequiredService<AuthDbContext>().Database;
+    await database.EnsureCreatedAsync();
+    // SQL Express creates databases with AUTO_CLOSE ON, which adds multi-second delays after idle periods.
+    await database.ExecuteSqlRawAsync("ALTER DATABASE CURRENT SET AUTO_CLOSE OFF");
 }
 
 app.UseForwardedHeaders();

@@ -13,6 +13,12 @@ export interface FoodItem {
   inStock: boolean;
   requiresCustomization: boolean;
   imageUrl: string | null;
+  /** "variants" | "variantsV2" when the dish has size/portion options. */
+  variantFormat: string | null;
+  /** Restaurant's default option per variant group; used when ordering. */
+  defaultVariants: { groupId: string; variationId: string }[] | null;
+  /** e.g. "Half · Serves 1" */
+  variantLabel: string | null;
 }
 
 export interface RankedFoodItem {

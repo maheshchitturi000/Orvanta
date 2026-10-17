@@ -51,7 +51,9 @@
                     <span>★ {{ ranked.item.rating | number: '1.1-1' }}@if (ranked.item.ratingCount) { <small>({{ ranked.item.ratingCount }})</small> }</span>
                   }
                   @if (ranked.item.requiresCustomization) {
-                    <span class="muted">Customisable</span>
+                    <span class="muted">Choose add-ons in app</span>
+                  } @else if (ranked.item.variantLabel) {
+                    <span class="muted">{{ ranked.item.variantLabel }}</span>
                   }
                 </div>
               </div>
@@ -80,6 +82,10 @@
 
           <h3>{{ ranked.item.name }}</h3>
           <p class="sub">{{ ranked.item.restaurantName }}</p>
+
+          @if (ranked.item.variantLabel && !ranked.item.requiresCustomization) {
+            <div class="option-chip">Option: <strong>{{ ranked.item.variantLabel }}</strong> <small>(restaurant default)</small></div>
+          }
 
           <div class="qty-row">
             <span>Quantity</span>

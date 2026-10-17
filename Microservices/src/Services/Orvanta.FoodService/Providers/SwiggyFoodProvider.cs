@@ -41,44 +41,148 @@ public sealed class SwiggyFoodProvider(IOptions<FoodProvidersOptions> options) :
         var result = await session.CallToolAsync("search_menu", args, ct);
 
         return JsonRead.ObjectsWith(result, "menu_item_id")
-            .Select(i => new FoodItem(
-                Key,
-                Settings.DisplayName,
-                JsonRead.Str(i, "menu_item_id")!,
-                JsonRead.Str(i, "name") ?? "Dish",
-                JsonRead.Str(i, "restaurant_id") ?? string.Empty,
-                JsonRead.Str(i, "restaurant_name") ?? "Restaurant",
-                PriceOf(i),
-                JsonRead.Dbl(i, "rating"),
-                JsonRead.Int(i, "totalRatings"),
-                JsonRead.Bool(i, "isVeg"),
-                JsonRead.Bool(i, "isBestseller") ?? false,
-                (JsonRead.Int(i, "inStock") ?? 1) > 0,
-                JsonRead.Bool(i, "hasVariants") == true || JsonRead.Bool(i, "hasAddons") == true
-                    || JsonRead.HasNonEmptyArray(i, "variations") || JsonRead.HasNonEmptyArray(i, "variantsV2"),
-                JsonRead.Str(i, "imageUrl")))
+            .Select(ToFoodItem)
             .Where(i => i.RestaurantId.Length > 0)
             .ToList();
     }
 
+    private FoodItem ToFoodItem(JsonElement i)
+    {
+        var defaults = DefaultVariants(i);
+
+        return new FoodItem(
+            Key,
+            Settings.DisplayName,
+            JsonRead.Str(i, "menu_item_id")!,
+            JsonRead.Str(i, "name") ?? "Dish",
+            JsonRead.Str(i, "restaurant_id") ?? string.Empty,
+            JsonRead.Str(i, "restaurant_name") ?? "Restaurant",
+            defaults?.Price ?? JsonRead.Dec(i, "price"),
+            JsonRead.Dbl(i, "rating"),
+            JsonRead.Int(i, "totalRatings"),
+            JsonRead.Bool(i, "isVeg"),
+            JsonRead.Bool(i, "isBestseller") ?? false,
+            (JsonRead.Int(i, "inStock") ?? 1) > 0,
+            // Default variants are picked automatically; only mandatory add-ons need the user.
+            RequiresCustomization: HasRequiredAddons(i) || defaults is { Resolved: false },
+            JsonRead.Str(i, "imageUrl"),
+            defaults?.Format,
+            defaults?.Choices,
+            defaults?.Label);
+    }
+
+    private sealed record DefaultSelection(string Format, IReadOnlyList<VariantChoice> Choices, string Label, decimal? Price, bool Resolved);
+
+    /// <summary>
+    /// Picks the restaurant's default option in each variant group (falling back to the first in-stock one).
+    /// Items use either "variations" (legacy, sent back as "variants") or "variantsV2", never both.
+    /// </summary>
+    private static DefaultSelection? DefaultVariants(JsonElement item)
+    {
+        if (item.TryGetProperty("variantsV2", out var groups) && groups.ValueKind == JsonValueKind.Array && groups.GetArrayLength() > 0)
+        {
+            var choices = new List<VariantChoice>();
+            var names = new List<string>();
+            decimal? price = null;
+
+            foreach (var group in groups.EnumerateArray())
+            {
+                var groupId = JsonRead.Str(group, "groupId", "group_id");
+                var pick = PickDefault(group.TryGetProperty("variations", out var v) ? v : default);
+                if (groupId is null || pick is null) return new DefaultSelection("variantsV2", [], string.Empty, null, false);
+
+                choices.Add(new VariantChoice(groupId, JsonRead.Str(pick.Value, "id")!));
+                names.Add(JsonRead.Str(pick.Value, "name") ?? string.Empty);
+                price = JsonRead.Dec(pick.Value, "price") ?? price;
+            }
+
+            return new DefaultSelection("variantsV2", choices, string.Join(" · ", names.Where(n => n.Length > 0)), price, true);
+        }
+
+        if (item.TryGetProperty("variations", out var variations) && variations.ValueKind == JsonValueKind.Array && variations.GetArrayLength() > 0)
+        {
+            var choices = new List<VariantChoice>();
+            var names = new List<string>();
+            decimal? price = null;
+
+            foreach (var group in variations.EnumerateArray().GroupBy(x => JsonRead.Str(x, "groupId", "group_id") ?? string.Empty))
+            {
+                var pick = PickDefault(group);
+                if (group.Key.Length == 0 || pick is null) return new DefaultSelection("variants", [], string.Empty, null, false);
+
+                choices.Add(new VariantChoice(group.Key, JsonRead.Str(pick.Value, "id")!));
+                names.Add(JsonRead.Str(pick.Value, "name") ?? string.Empty);
+                price = JsonRead.Dec(pick.Value, "price") ?? price;
+            }
+
+            return new DefaultSelection("variants", choices, string.Join(" · ", names.Where(n => n.Length > 0)), price, true);
+        }
+
+        return null;
+    }
+
+    private static JsonElement? PickDefault(IEnumerable<JsonElement> options)
+    {
+        var list = options.Where(o => o.ValueKind == JsonValueKind.Object && JsonRead.Str(o, "id") is not null).ToList();
+        var inStock = list.Where(o => (JsonRead.Int(o, "inStock") ?? 1) > 0).ToList();
+        var pick = inStock.FirstOrDefault(o => JsonRead.Bool(o, "default") == true);
+        if (pick.ValueKind == JsonValueKind.Object) return pick;
+        return inStock.Count > 0 ? inStock[0] : null;
+    }
+
+    private static JsonElement? PickDefault(JsonElement array) =>
+        array.ValueKind == JsonValueKind.Array ? PickDefault(array.EnumerateArray()) : null;
+
+    private static bool HasMandatoryAddons(JsonElement cart) =>
+        JsonRead.Find(cart, "valid_addons") is { ValueKind: JsonValueKind.Array } groups
+        && groups.EnumerateArray().Any(g => (JsonRead.Int(g, "minAddons", "min_addons") ?? 0) > 0);
+
+    private static bool HasRequiredAddons(JsonElement item) =>
+        item.TryGetProperty("addons", out var addons)
+        && addons.ValueKind == JsonValueKind.Array
+        && addons.EnumerateArray().Any(g => (JsonRead.Int(g, "minAddons") ?? 0) > 0);
+
     public async Task<CartPreview> PrepareCartAsync(McpSession session, CartRequest request, CancellationToken ct)
     {
         await session.CallToolAsync("flush_food_cart", new JsonObject(), ct);
+
+        var cartItem = new JsonObject
+        {
+            ["menu_item_id"] = request.MenuItemId,
+            ["quantity"] = request.Quantity
+        };
+
+        // Use the same format the item came with: "variants" (legacy "variations") or "variantsV2".
+        if (request.Variants is { Count: > 0 } && request.VariantFormat is "variants" or "variantsV2")
+        {
+            cartItem[request.VariantFormat] = new JsonArray(request.Variants
+                .Select(v => (JsonNode)new JsonObject { ["group_id"] = v.GroupId, ["variation_id"] = v.VariationId })
+                .ToArray());
+        }
 
         await session.CallToolAsync("update_food_cart", new JsonObject
         {
             ["restaurantId"] = request.RestaurantId,
             ["restaurantName"] = request.RestaurantName,
             ["addressId"] = request.AddressId,
-            ["cartItems"] = new JsonArray(new JsonObject
-            {
-                ["menu_item_id"] = request.MenuItemId,
-                ["quantity"] = request.Quantity
-            })
+            ["cartItems"] = new JsonArray(cartItem)
         }, ct);
 
         // update_food_cart doesn't render the bill; the docs say to read the cart right after.
-        var cart = await session.CallToolAsync("get_food_cart", new JsonObject { ["addressId"] = request.AddressId }, ct);
+        var cart = await session.CallToolAsync("get_food_cart",
+            new JsonObject { ["addressId"] = request.AddressId, ["restaurantName"] = request.RestaurantName }, ct);
+
+        if (!JsonRead.ObjectsWith(cart, "menu_item_id").Any())
+        {
+            throw new FoodProviderException("Swiggy didn't accept this item into the cart. It may need choices that can only be made in the Swiggy app.");
+        }
+
+        // Search results only say "hasAddons"; the cart tells us whether any add-on group is mandatory.
+        if (HasMandatoryAddons(cart))
+        {
+            await session.CallToolAsync("flush_food_cart", new JsonObject(), ct);
+            throw new FoodProviderException("This dish needs an add-on choice that the restaurant requires. Please pick another dish or order it in the Swiggy app.");
+        }
         var paymentOptions = await session.CallToolAsync("get_payment_options", new JsonObject { ["addressId"] = request.AddressId }, ct);
 
         var cashMethod = string.IsNullOrWhiteSpace(Settings.CashPaymentMethod) ? "Cash" : Settings.CashPaymentMethod;
@@ -136,19 +240,4 @@ public sealed class SwiggyFoodProvider(IOptions<FoodProvidersOptions> options) :
         return new PlacedOrder(orderId, status, cart.ToPay, message);
     }
 
-    private static decimal? PriceOf(JsonElement item)
-    {
-        var price = JsonRead.Dec(item, "price");
-        if (price is not null) return price;
-
-        // Variant-only items carry the price on the default variation.
-        if (item.TryGetProperty("variations", out var variations) && variations.ValueKind == JsonValueKind.Array)
-        {
-            var preferred = variations.EnumerateArray().FirstOrDefault(v => JsonRead.Bool(v, "default") == true);
-            if (preferred.ValueKind == JsonValueKind.Object) return JsonRead.Dec(preferred, "price");
-            if (variations.GetArrayLength() > 0) return JsonRead.Dec(variations[0], "price");
-        }
-
-        return null;
-    }
 }

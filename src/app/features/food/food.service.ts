@@ -21,7 +21,9 @@ export class FoodService {
       menuItemId: item.menuItemId,
       itemName: item.name,
       quantity,
-      requiresCustomization: item.requiresCustomization
+      requiresCustomization: item.requiresCustomization,
+      variantFormat: item.variantFormat,
+      variants: item.defaultVariants
     });
   }
 

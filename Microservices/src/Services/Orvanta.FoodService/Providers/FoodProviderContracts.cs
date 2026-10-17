@@ -4,6 +4,9 @@ namespace Orvanta.FoodService.Providers;
 
 public sealed record DeliveryAddress(string Id, string? Label, string? AddressLine, string? PhoneNumber);
 
+/// <summary>One selected option inside a variant group (e.g. group "Size" → "Half").</summary>
+public sealed record VariantChoice(string GroupId, string VariationId);
+
 public sealed record FoodItem(
     string Provider,
     string ProviderName,
@@ -17,8 +20,15 @@ public sealed record FoodItem(
     bool? IsVeg,
     bool IsBestseller,
     bool InStock,
+    /// <summary>True only when the restaurant forces a choice we can't make for the user (e.g. required add-ons).</summary>
     bool RequiresCustomization,
-    string? ImageUrl);
+    string? ImageUrl,
+    /// <summary>Provider-specific variant format ("variants" or "variantsV2"); null when the dish has no variants.</summary>
+    string? VariantFormat = null,
+    /// <summary>The restaurant's default option per variant group, used when ordering.</summary>
+    IReadOnlyList<VariantChoice>? DefaultVariants = null,
+    /// <summary>Human readable default option, e.g. "Half · Serves 1".</summary>
+    string? VariantLabel = null);
 
 public sealed record CartLine(string Name, int Quantity, decimal Total);
 
@@ -37,7 +47,14 @@ public sealed record CartPreview(
     /// <summary>Provider cart reference when the provider needs one to check out.</summary>
     string? CartId);
 
-public sealed record CartRequest(string RestaurantId, string RestaurantName, string MenuItemId, int Quantity, string AddressId);
+public sealed record CartRequest(
+    string RestaurantId,
+    string RestaurantName,
+    string MenuItemId,
+    int Quantity,
+    string AddressId,
+    string? VariantFormat = null,
+    IReadOnlyList<VariantChoice>? Variants = null);
 
 public sealed record PlacedOrder(string? ProviderOrderId, string Status, decimal? Total, string Message);
 

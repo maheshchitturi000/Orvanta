@@ -54,7 +54,10 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
-    await scope.ServiceProvider.GetRequiredService<FoodDbContext>().Database.EnsureCreatedAsync();
+    var database = scope.ServiceProvider.GetRequiredService<FoodDbContext>().Database;
+    await database.EnsureCreatedAsync();
+    // SQL Express creates databases with AUTO_CLOSE ON, which adds multi-second delays after idle periods.
+    await database.ExecuteSqlRawAsync("ALTER DATABASE CURRENT SET AUTO_CLOSE OFF");
 }
 
 app.UseForwardedHeaders();
