@@ -27,6 +27,8 @@ public static class SkillCatalog
         ["Angular", "angularjs", "angular 2+"], ["React", "react.js", "reactjs"], ["Vue", "vue.js", "vuejs"], ["Next.js", "nextjs"],
         ["Svelte"], ["RxJS"], ["NgRx"], ["Redux"], ["HTML", "html5"], ["CSS", "css3"], ["SASS", "scss"], ["Tailwind", "tailwindcss"],
         ["Bootstrap"], ["jQuery"], ["Webpack"], ["Flutter"], ["React Native"],
+        // Named stacks (a stack in a job title is a core requirement)
+        ["MERN Stack", "mern"], ["MEAN Stack", "mean stack"], ["LAMP Stack", "lamp stack"],
         // Data
         ["SQL Server", "mssql", "ms sql", "microsoft sql server"], ["PostgreSQL", "postgres"], ["MySQL"], ["Oracle"], ["MongoDB", "mongo"],
         ["Redis"], ["Elasticsearch", "elastic search"], ["Cassandra"], ["DynamoDB"], ["Cosmos DB", "cosmosdb"], ["Snowflake"], ["BigQuery"],
@@ -74,7 +76,8 @@ public static class SkillCatalog
         ["Azure Functions"] = ["Azure", "Serverless"], ["Service Bus"] = ["Azure"], ["AWS Lambda"] = ["AWS", "Serverless"],
         ["Kubernetes"] = ["Docker"], ["Azure DevOps"] = ["CI/CD"], ["GitHub Actions"] = ["CI/CD"], ["Jenkins"] = ["CI/CD"],
         ["xUnit"] = ["Unit Testing"], ["NUnit"] = ["Unit Testing"], ["Jest"] = ["Unit Testing"], ["Scrum"] = ["Agile"],
-        ["PyTorch"] = ["Machine Learning"], ["TensorFlow"] = ["Machine Learning"], ["Deep Learning"] = ["Machine Learning"]
+        ["PyTorch"] = ["Machine Learning"], ["TensorFlow"] = ["Machine Learning"], ["Deep Learning"] = ["Machine Learning"],
+        ["MERN Stack"] = ["MongoDB", "Express", "React", "Node.js"], ["MEAN Stack"] = ["MongoDB", "Express", "Angular", "Node.js"]
     };
 
     /// <summary>The skills plus everything they imply, normalized.</summary>

@@ -133,6 +133,17 @@ public class JobMatcherTests
     }
 
     [Fact]
+    public void Missing_stack_named_in_title_keeps_job_below_threshold()
+    {
+        var job = Job("Full Stack Developer (MERN Stack)", "Build features with JavaScript, HTML, CSS and REST APIs. 2+ years.");
+        var preference = new JobPreference { DesiredTitles = ["Full Stack Developer"] };
+
+        var result = JobMatcher.Score(Profile, preference, job);
+
+        Assert.True(result.Score <= 70, $"score was {result.Score}");
+    }
+
+    [Fact]
     public void Large_experience_gap_keeps_job_below_threshold()
     {
         var junior = new CandidateProfile { TotalYearsExperience = 3, Skills = Profile.Skills };

@@ -31,11 +31,17 @@ public sealed class SourceService(IEnumerable<IJobSearchSource> sources, JobSour
         }
         catch (HttpRequestException ex)
         {
-            logger.LogInformation("Key check for {Source} failed: {Message}", source.Name, ex.Message);
-            return ServiceResult<SourceStatusDto>.Fail(400,
-                ex.Message.Contains("quota", StringComparison.OrdinalIgnoreCase)
-                    ? "This key works but its monthly quota is used up. Try again next month or upgrade the plan."
-                    : "That key didn't work. Copy the X-RapidAPI-Key from RapidAPI → JSearch → Endpoints, and make sure you subscribed to a plan (Basic is free).");
+            logger.LogWarning("Key check for {Source} failed: {Message}", source.Name, ex.Message);
+
+            // Only blame the key when the provider actually rejected it.
+            if (ex.Message.Contains("API key", StringComparison.OrdinalIgnoreCase))
+                return ServiceResult<SourceStatusDto>.Fail(400,
+                    "That key was rejected. Copy the x-rapidapi-key value (without quotes) from RapidAPI → JSearch → Playground, and make sure you subscribed to the Basic (free) plan.");
+
+            if (ex.Message.Contains("quota", StringComparison.OrdinalIgnoreCase))
+                return ServiceResult<SourceStatusDto>.Fail(400, "This key works but its monthly quota is used up. Try again next month or upgrade the plan.");
+
+            return ServiceResult<SourceStatusDto>.Fail(502, $"{source.DisplayName} couldn't be reached to check the key ({ex.Message}). Please try again shortly.");
         }
 
         await credentials.SaveAsync(userId, source.Name, key, ct);

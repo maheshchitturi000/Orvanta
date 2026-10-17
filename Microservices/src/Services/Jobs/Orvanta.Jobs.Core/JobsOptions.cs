@@ -32,6 +32,9 @@ public sealed class JSearchOptions
     public string BaseUrl { get; set; } = "https://jsearch.p.rapidapi.com";
     public string Host { get; set; } = "jsearch.p.rapidapi.com";
 
+    /// <summary>Search endpoint path. JSearch replaced "/search" with "/search-v2".</summary>
+    public string SearchPath { get; set; } = "/search-v2";
+
     /// <summary>Searches per discovery run (role × location). Each costs one API request.</summary>
     public int MaxQueriesPerRun { get; set; } = 3;
 

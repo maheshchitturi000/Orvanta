@@ -63,7 +63,7 @@ public class JSearchTests
         var job = Assert.Single(jobs);
         Assert.Equal("linkedin", job.Source);
         Assert.Equal("Contoso", job.Company);
-        Assert.Equal("Bengaluru, Karnataka, IN", job.Location);
+        Assert.Equal("Bengaluru, Karnataka, India", job.Location);
         Assert.Equal("https://www.linkedin.com/jobs/view/123", job.ApplyUrl);
         Assert.Equal(new DateTime(2026, 10, 15, 9, 0, 0, DateTimeKind.Utc), job.PostedAtUtc);
 
@@ -71,6 +71,39 @@ public class JSearchTests
         Assert.Equal("test-key", request.Headers.GetValues("x-rapidapi-key").Single());
         Assert.Contains("country=in", request.RequestUri!.Query);
         Assert.Contains("query=.NET%20Developer%20in%20Bengaluru%2C%20India", request.RequestUri.Query);
+    }
+
+    [Fact]
+    public async Task Reads_v2_responses_and_calls_search_v2()
+    {
+        const string v2 = """
+            { "status": "OK", "data": { "jobs": [
+              { "job_id": "very-long-id", "job_uid": "Xu2lSF8qDlnzRCKuAAAAAA==", "job_title": ".Net API Developer",
+                "employer_name": "People Prime", "job_publisher": "LinkedIn", "job_apply_link": "https://in.linkedin.com/jobs/view/1",
+                "job_location": "Bengaluru, Karnataka", "job_country": "IN", "job_description": "C# .NET", "job_posted_at_datetime_utc": "2026-10-16T00:00:00.000Z" },
+              { "job_uid": "abc", "job_title": "Engineer", "job_publisher": "Jobs | Siemens Healthineers", "job_apply_link": "https://jobs.siemens.com/1" }
+            ], "cursor": "next" } }
+            """;
+        var handler = new StubHandler(v2);
+        var source = new JSearchSource(new StubFactory(handler), Options(), NullLogger<JSearchSource>.Instance);
+
+        var jobs = await source.SearchAsync(new JobSearchQuery(".NET Developer", "Bengaluru", false), "k", default);
+
+        Assert.Equal("/search-v2", handler.Last!.RequestUri!.AbsolutePath);
+        Assert.Equal(2, jobs.Count);
+        Assert.Equal("Xu2lSF8qDlnzRCKuAAAAAA==", jobs[0].ExternalId);
+        Assert.Equal("Bengaluru, Karnataka, India", jobs[0].Location);
+        Assert.Equal("company", jobs[1].Source);
+    }
+
+    [Fact]
+    public async Task Missing_endpoint_is_reported_as_such_not_as_a_bad_key()
+    {
+        var source = new JSearchSource(new StubFactory(new StubHandler("{}", HttpStatusCode.NotFound)), Options(), NullLogger<JSearchSource>.Instance);
+
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() => source.SearchAsync(new JobSearchQuery("x", null, false), "k", default));
+        Assert.Contains("not found", error.Message);
+        Assert.DoesNotContain("API key", error.Message);
     }
 
     [Fact]
@@ -87,6 +120,7 @@ public class JSearchTests
     [InlineData("Naukri.com", "", "naukri")]
     [InlineData("", "https://www.indeed.co.in/viewjob?jk=1", "indeed")]
     [InlineData("", "not a url", "web")]
+    [InlineData("Citi Careers", "", "company")]
     public void Normalizes_publishers(string publisher, string link, string expected) =>
         Assert.Equal(expected, JSearchSource.Publisher(publisher, link));
 

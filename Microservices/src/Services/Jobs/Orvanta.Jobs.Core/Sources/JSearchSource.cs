@@ -51,7 +51,7 @@ public sealed partial class JSearchSource(IHttpClientFactory factory, IOptions<J
         if (query.RemoteOnly) parameters["work_from_home"] = "true";
 
         var queryString = string.Join("&", parameters.Select(p => $"{p.Key}={Uri.EscapeDataString(p.Value ?? string.Empty)}"));
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"{_options.BaseUrl.TrimEnd('/')}/search?{queryString}");
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{_options.BaseUrl.TrimEnd('/')}/{_options.SearchPath.TrimStart('/')}?{queryString}");
         request.Headers.Add("x-rapidapi-key", apiKey);
         request.Headers.Add("x-rapidapi-host", _options.Host);
 
@@ -60,28 +60,44 @@ public sealed partial class JSearchSource(IHttpClientFactory factory, IOptions<J
             throw new HttpRequestException("JSearch rejected the API key (check Jobs:JSearch:ApiKey and your RapidAPI subscription).");
         if ((int)response.StatusCode == 429)
             throw new HttpRequestException("JSearch monthly quota reached.");
+        if ((int)response.StatusCode == 404)
+            throw new HttpRequestException($"JSearch endpoint '{_options.SearchPath}' not found (check Jobs:JSearch:SearchPath).");
         response.EnsureSuccessStatusCode();
 
         var root = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-        if (!root.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
+
+        // v2: { data: { jobs: [...], cursor } }   v1: { data: [...] }
+        var jobs = root.RootElement.TryGetProperty("data", out var data)
+            ? data.ValueKind == JsonValueKind.Array ? data
+              : data.ValueKind == JsonValueKind.Object && data.TryGetProperty("jobs", out var list) && list.ValueKind == JsonValueKind.Array ? list
+              : default
+            : default;
+
+        if (jobs.ValueKind != JsonValueKind.Array)
         {
-            logger.LogWarning("JSearch returned no data array for \"{Query}\"", text);
+            logger.LogWarning("JSearch returned no jobs for \"{Query}\"", text);
             return [];
         }
 
-        return data.EnumerateArray().Select(Map).Where(j => j is not null).Select(j => j!).ToList();
+        return jobs.EnumerateArray().Select(Map).Where(j => j is not null).Select(j => j!).ToList();
     }
 
     private static SourcedJob? Map(JsonElement j)
     {
-        var id = Str(j, "job_id");
+        // job_uid is short and stable; job_id can exceed 200 characters.
+        var id = Str(j, "job_uid") is { Length: > 0 } uid ? uid : Str(j, "job_id");
         var title = Str(j, "job_title");
         if (id.Length == 0 || title.Length == 0) return null;
 
         var applyUrl = Str(j, "job_apply_link");
-        var location = Str(j, "job_location") is { Length: > 0 } l
+        // "Bengaluru, Karnataka" + country "IN" → "Bengaluru, Karnataka, India", so country filters match.
+        var place = Str(j, "job_location") is { Length: > 0 } l
             ? l
-            : string.Join(", ", new[] { Str(j, "job_city"), Str(j, "job_state"), Str(j, "job_country") }.Where(x => x.Length > 0));
+            : string.Join(", ", new[] { Str(j, "job_city"), Str(j, "job_state") }.Where(x => x.Length > 0));
+        var country = CountryName(Str(j, "job_country"));
+        var location = country.Length == 0 || place.Contains(country, StringComparison.OrdinalIgnoreCase)
+            ? place
+            : place.Length == 0 ? country : $"{place}, {country}";
 
         var posted = Str(j, "job_posted_at_datetime_utc") is { Length: > 0 } p
                      && DateTimeOffset.TryParse(p, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d)
@@ -106,6 +122,14 @@ public sealed partial class JSearchSource(IHttpClientFactory factory, IOptions<J
     /// <summary>"LinkedIn" → "linkedin", "Naukri.com" → "naukri"; falls back to the apply link's host.</summary>
     public static string Publisher(string publisher, string applyUrl)
     {
+        // "Jobs | Siemens Healthineers", "Careers at Contoso": the employer's own careers site.
+        if (publisher.Contains('|') || publisher.StartsWith("careers", StringComparison.OrdinalIgnoreCase)
+            || publisher.EndsWith("careers", StringComparison.OrdinalIgnoreCase)
+            || publisher.StartsWith("jobs at", StringComparison.OrdinalIgnoreCase))
+        {
+            return "company";
+        }
+
         var name = publisher.Length > 0 ? publisher : Uri.TryCreate(applyUrl, UriKind.Absolute, out var uri) ? uri.Host : "web";
         name = name.ToLowerInvariant().Replace("www.", string.Empty);
         name = NonAlnum().Replace(name.Split('.')[0], string.Empty);
@@ -114,6 +138,20 @@ public sealed partial class JSearchSource(IHttpClientFactory factory, IOptions<J
 
     private static string Str(JsonElement e, string key) =>
         e.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString()! : string.Empty;
+
+    /// <summary>"IN" → "India", "GB" → "United Kingdom"; unknown codes → "".</summary>
+    private static string CountryName(string isoCode)
+    {
+        if (isoCode.Length != 2) return string.Empty;
+        try
+        {
+            return new RegionInfo(isoCode).EnglishName;
+        }
+        catch (ArgumentException)
+        {
+            return string.Empty;
+        }
+    }
 
     [GeneratedRegex("[^a-z0-9]")]
     private static partial Regex NonAlnum();
