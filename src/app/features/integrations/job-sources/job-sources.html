@@ -45,8 +45,9 @@
 
     @if (connecting() === s.name) {
       <div class="connect">
+        <p class="lead">We opened JSearch in a new tab. Get your free key there, then paste it here.</p>
         <ol class="steps">
-          <li>Open <a href="https://rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch" target="_blank" rel="noopener">JSearch on RapidAPI</a> and sign up (free).</li>
+          <li>In that tab, sign up or log in (free). Tab didn't open? <a [href]="signUpUrl" target="_blank" rel="noopener">Open JSearch</a>.</li>
           <li>Click <b>Subscribe to Test</b> and choose the <b>Basic</b> plan (free, about 200 searches a month).</li>
           <li>Copy the <b>X-RapidAPI-Key</b> value shown in the code example and paste it below.</li>
         </ol>

@@ -78,6 +78,12 @@
   background: var(--lavender-25);
 }
 
+.lead {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lavender-900);
+}
+
 .steps {
   display: grid;
   gap: 6px;

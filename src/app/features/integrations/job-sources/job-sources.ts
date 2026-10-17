@@ -40,11 +40,20 @@ export class JobSources implements OnInit {
     }
   }
 
+  protected readonly signUpUrl = 'https://rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch';
+
+  /** Opens the provider's sign-up page in a new tab and shows the paste-key form here. */
   protected startConnect(source: JobSourceStatus): void {
+    window.open(this.signUpUrl, '_blank', 'noopener');
     this.connecting.set(source.name);
     this.apiKey.set('');
     this.error.set('');
     this.success.set('');
+    setTimeout(() => {
+      const input = document.getElementById('apiKey');
+      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      input?.focus();
+    });
   }
 
   protected cancel(): void {
