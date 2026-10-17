@@ -1,0 +1,6 @@
+@Orvanta.VoiceService_HostAddress = http://localhost:5027
+
+GET {{Orvanta.VoiceService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

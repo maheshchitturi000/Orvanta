@@ -1,0 +1,112 @@
+<div class="page">
+  <header class="head">
+    <a class="back" routerLink="/">← Back to chat</a>
+    <span class="eyebrow">Orvanta AI · Workspace</span>
+    <h1>Integrations</h1>
+    <p>Connect the apps Orvanta can use on your behalf. Sign-in happens on each provider’s official page; Orvanta never sees your provider password.</p>
+  </header>
+
+  @if (success()) {
+    <div class="alert success" role="status">✓ {{ success() }}</div>
+  }
+  @if (error()) {
+    <div class="alert error" role="alert">{{ error() }}</div>
+  }
+
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <h2>Food &amp; delivery</h2>
+        <p>Orvanta compares connected apps and shows you the top 5 dishes.</p>
+      </div>
+      <button type="button" class="btn btn-outline btn-sm" (click)="load()" [disabled]="loading()">↻ Refresh</button>
+    </div>
+
+    @if (loading() && !providers().length) {
+      <div class="card skeleton"></div>
+      <div class="card skeleton"></div>
+    }
+
+    @for (p of providers(); track p.provider) {
+      <article class="card provider">
+        <div class="provider-top">
+          <span class="logo" [attr.data-provider]="p.provider">{{ meta(p.provider).letter }}</span>
+          <div class="provider-copy">
+            <div class="title-row">
+              <h3>{{ p.displayName }}</h3>
+              @if (!p.enabled) {
+                <span class="badge muted">Unavailable</span>
+              } @else if (p.isConnected) {
+                <span class="badge success">● Connected</span>
+              } @else {
+                <span class="badge muted">Not connected</span>
+              }
+            </div>
+            <p>{{ meta(p.provider).blurb }}</p>
+            @if (p.isConnected && p.connectedAt) {
+              <small>Connected {{ p.connectedAt | date: 'mediumDate' }}</small>
+            }
+          </div>
+
+          <div class="actions">
+            @if (p.isConnected) {
+              <button type="button" class="btn btn-outline btn-sm" (click)="connect(p)" [disabled]="busy() === p.provider">Reconnect</button>
+              <button type="button" class="btn btn-danger-ghost btn-sm" (click)="disconnect(p)" [disabled]="busy() === p.provider">Disconnect</button>
+            } @else {
+              <button type="button" class="btn btn-primary btn-sm" (click)="connect(p)" [disabled]="!p.enabled || busy() === p.provider">
+                @if (busy() === p.provider) { <span class="spinner"></span> Opening… } @else { Connect {{ p.displayName }} ↗ }
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (p.isConnected) {
+          <button type="button" class="accordion" (click)="toggleAddresses(p)" [attr.aria-expanded]="panel(p.provider).open">
+            <span>Delivery addresses @if (panel(p.provider).items.length) { · {{ panel(p.provider).items.length }} }</span>
+            <span class="chev" [class.open]="panel(p.provider).open">⌄</span>
+          </button>
+
+          @if (panel(p.provider).open) {
+            <div class="addresses">
+              <div class="addresses-head">
+                <p>Orvanta searches and delivers to your <strong>default</strong> address.</p>
+                <button type="button" class="btn btn-ghost btn-sm" (click)="loadAddresses(p.provider, true)" [disabled]="panel(p.provider).loading">↻ Sync from {{ p.displayName }}</button>
+              </div>
+
+              @if (panel(p.provider).loading) {
+                <p class="state"><span class="spinner"></span> Loading addresses…</p>
+              } @else if (panel(p.provider).error) {
+                <div class="alert error">{{ panel(p.provider).error }}</div>
+              } @else if (!panel(p.provider).items.length) {
+                <p class="state">No saved addresses. Add one in the {{ p.displayName }} app, then sync.</p>
+              } @else {
+                @for (a of panel(p.provider).items; track a.id) {
+                  <div class="address" [class.default]="a.isDefault">
+                    <div>
+                      <strong>{{ a.label || 'Address' }}</strong>
+                      <p>{{ a.addressLine || 'Address details unavailable' }}</p>
+                    </div>
+                    @if (a.isDefault) {
+                      <span class="badge">Default</span>
+                    } @else {
+                      <button type="button" class="btn btn-ghost btn-sm" (click)="makeDefault(p.provider, a)">Make default</button>
+                    }
+                  </div>
+                }
+              }
+            </div>
+          }
+        }
+      </article>
+    }
+  </section>
+
+  <section class="card soon">
+    <span class="soon-icon">✈</span>
+    <div>
+      <h3>Travel is coming next</h3>
+      <p>Flights, trains and hotels will plug into the same integration framework.</p>
+    </div>
+    <span class="badge">Coming soon</span>
+  </section>
+</div>

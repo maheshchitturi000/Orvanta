@@ -1,0 +1,41 @@
+<div class="auth-page">
+  <aside class="showcase" aria-hidden="true">
+    <div class="showcase-brand">
+      <span class="brand-mark">O</span>
+      <span class="brand-name">orvanta<span>.ai</span></span>
+    </div>
+
+    <div class="showcase-copy">
+      <span class="eyebrow">Your personal AI concierge</span>
+      <h2>Tell it what you're craving. It handles the rest.</h2>
+      <p>Orvanta searches Swiggy and Zomato together, picks the top 5 dishes and orders for you with cash on delivery.</p>
+    </div>
+
+    <ul class="showcase-points">
+      <li><span class="dot"></span>Top-rated picks across apps in seconds</li>
+      <li><span class="dot"></span>You review the bill before anything is ordered</li>
+      <li><span class="dot"></span>Encrypted sessions and protected credentials</li>
+    </ul>
+
+    <div class="orb orb-one"></div>
+    <div class="orb orb-two"></div>
+  </aside>
+
+  <main class="panel">
+    <div class="panel-inner">
+      <div class="mobile-brand">
+        <span class="brand-mark">O</span>
+        <span class="brand-name">orvanta<span>.ai</span></span>
+      </div>
+
+      <header class="panel-header">
+        <h1>{{ heading() }}</h1>
+        @if (subheading()) {
+          <p>{{ subheading() }}</p>
+        }
+      </header>
+
+      <ng-content />
+    </div>
+  </main>
+</div>

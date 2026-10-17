@@ -1,0 +1,119 @@
+<app-auth-shell heading="Create your account" subheading="It takes a minute. We'll verify your email with a one-time code.">
+  <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    @if (errorMessage()) {
+      <div class="alert error" role="alert">{{ errorMessage() }}</div>
+    }
+
+    <div class="field">
+      <label for="fullName">Full name</label>
+      <input id="fullName" class="input" formControlName="fullName" autocomplete="name"
+             placeholder="e.g. Priya Sharma" [class.invalid]="showError('fullName')" />
+      @if (showError('fullName')) {
+        <span class="error-text">{{ errorFor('fullName') }}</span>
+      }
+    </div>
+
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" class="input" type="email" formControlName="email" autocomplete="email"
+             placeholder="you@example.com" [class.invalid]="showError('email')" />
+      @if (showError('email')) {
+        <span class="error-text">{{ errorFor('email') }}</span>
+      }
+    </div>
+
+    <div class="field">
+      <label for="phoneNumber">Mobile number</label>
+      <div class="prefix-group">
+        <span class="prefix">+91</span>
+        <input id="phoneNumber" class="input" type="tel" inputmode="numeric" maxlength="10"
+               formControlName="phoneNumber" autocomplete="tel-national" placeholder="98765 43210"
+               [class.invalid]="showError('phoneNumber')" />
+      </div>
+      @if (showError('phoneNumber')) {
+        <span class="error-text">{{ errorFor('phoneNumber') }}</span>
+      } @else {
+        <span class="hint">Used by delivery partners for your food orders.</span>
+      }
+    </div>
+
+    <div class="field">
+      <label for="password">Password</label>
+      <div class="input-group">
+        <input id="password" class="input" [type]="showPassword() ? 'text' : 'password'"
+               formControlName="password" autocomplete="new-password" placeholder="Create a strong password"
+               [class.invalid]="showError('password')" />
+        <button type="button" class="input-action" (click)="showPassword.set(!showPassword())"
+                [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'">
+          {{ showPassword() ? 'Hide' : 'Show' }}
+        </button>
+      </div>
+
+      <div class="strength" [attr.data-score]="strength()">
+        <div class="strength-bars">
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <span class="strength-label">{{ strengthLabel() }}</span>
+      </div>
+
+      <ul class="rules">
+        @for (rule of passwordRules(); track rule.label) {
+          <li [class.ok]="rule.ok">
+            <span class="rule-icon" aria-hidden="true">{{ rule.ok ? '✓' : '•' }}</span>{{ rule.label }}
+          </li>
+        }
+      </ul>
+
+      @if (showError('password') && form.controls.password.errors?.['server']) {
+        <span class="error-text">{{ errorFor('password') }}</span>
+      }
+    </div>
+
+    <div class="field">
+      <label for="confirmPassword">Confirm password</label>
+      <input id="confirmPassword" class="input" [type]="showPassword() ? 'text' : 'password'"
+             formControlName="confirmPassword" autocomplete="new-password" placeholder="Re-enter your password"
+             [class.invalid]="showError('confirmPassword')" />
+      @if (showError('confirmPassword')) {
+        <span class="error-text">{{ errorFor('confirmPassword') }}</span>
+      }
+    </div>
+
+    <div class="field">
+      <label class="checkbox">
+        <input type="checkbox" formControlName="acceptTerms" />
+        <span>
+          I agree to the
+          <button type="button" class="link-button" (click)="showTerms.set(!showTerms())">Terms &amp; Conditions</button>
+          and allow Orvanta to search and place orders on my behalf only after I confirm them.
+        </span>
+      </label>
+      @if (showError('acceptTerms')) {
+        <span class="error-text">{{ errorFor('acceptTerms') }}</span>
+      }
+
+      @if (showTerms()) {
+        <div class="terms">
+          <h3>Terms &amp; Conditions (summary)</h3>
+          <ol>
+            <li>Orvanta acts on your behalf with services you connect (e.g. Swiggy, Zomato) using their official authorization.</li>
+            <li>Orders are placed only after you review and confirm the bill. Payment is cash on delivery to the delivery partner.</li>
+            <li>Prices, availability and delivery are set by the provider and restaurant; Orvanta doesn't guarantee them.</li>
+            <li>Your password is stored only as a salted, one-way hash. Connected-service tokens are encrypted at rest.</li>
+            <li>You can disconnect any service or delete your account at any time.</li>
+          </ol>
+        </div>
+      }
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block" [disabled]="submitting()">
+      @if (submitting()) {
+        <span class="spinner"></span> Creating account…
+      } @else {
+        Create account
+      }
+    </button>
+
+    <p class="switch">Already have an account? <a routerLink="/login">Sign in</a></p>
+  </form>
+</app-auth-shell>

@@ -1,0 +1,168 @@
+<section class="food">
+  @for (issue of result().issues; track issue.provider) {
+    <div class="alert" [class.info]="issue.needsConnection" [class.warning]="!issue.needsConnection">
+      <span>{{ issue.message }}</span>
+      @if (issue.needsConnection) {
+        <a class="issue-link" routerLink="/integrations">Connect</a>
+      }
+    </div>
+  }
+
+  @switch (step()) {
+    @case ('browse') {
+      @if (result().items.length) {
+        <header class="food-head">
+          <div>
+            <h3>Top {{ result().items.length }} for “{{ result().query }}”</h3>
+            <p>Ranked by rating, popularity and match{{ result().vegOnly ? ' · veg only' : '' }}</p>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" (click)="choose(result().items[0])">
+            Order top pick
+          </button>
+        </header>
+
+        <ol class="items">
+          @for (ranked of result().items; track ranked.item.provider + ranked.item.menuItemId) {
+            <li class="item">
+              <span class="rank">{{ ranked.rank }}</span>
+
+              <div class="thumb">
+                @if (ranked.item.imageUrl) {
+                  <img [src]="ranked.item.imageUrl" [alt]="ranked.item.name" loading="lazy" />
+                } @else {
+                  <span>🍽</span>
+                }
+              </div>
+
+              <div class="info">
+                <div class="name-row">
+                  @if (ranked.item.isVeg !== null) {
+                    <span class="diet" [class.veg]="ranked.item.isVeg" [attr.title]="ranked.item.isVeg ? 'Veg' : 'Non-veg'"></span>
+                  }
+                  <strong>{{ ranked.item.name }}</strong>
+                  @if (ranked.item.isBestseller) {
+                    <span class="badge warning">Bestseller</span>
+                  }
+                </div>
+                <span class="restaurant">{{ ranked.item.restaurantName }}</span>
+                <div class="meta">
+                  <span class="provider" [attr.data-provider]="ranked.item.provider">{{ ranked.item.providerName }}</span>
+                  @if (ranked.item.rating) {
+                    <span>★ {{ ranked.item.rating | number: '1.1-1' }}@if (ranked.item.ratingCount) { <small>({{ ranked.item.ratingCount }})</small> }</span>
+                  }
+                  @if (ranked.item.requiresCustomization) {
+                    <span class="muted">Customisable</span>
+                  }
+                </div>
+              </div>
+
+              <div class="buy">
+                <span class="price">
+                  {{ ranked.item.price !== null ? (ranked.item.price | currency: 'INR' : 'symbol' : '1.0-0') : '—' }}
+                </span>
+                <button type="button" class="btn btn-outline btn-sm" (click)="choose(ranked)">Order</button>
+              </div>
+            </li>
+          }
+        </ol>
+      } @else if (!result().issues.length) {
+        <div class="alert info">No dishes matched “{{ result().query }}” near your saved address. Try a different dish name.</div>
+      }
+    }
+
+    @case ('quantity') {
+      @if (selected(); as ranked) {
+        <div class="panel">
+          <div class="panel-title">
+            <button type="button" class="btn btn-ghost btn-sm" (click)="back()">← Back</button>
+            <span class="provider" [attr.data-provider]="ranked.item.provider">{{ ranked.item.providerName }}</span>
+          </div>
+
+          <h3>{{ ranked.item.name }}</h3>
+          <p class="sub">{{ ranked.item.restaurantName }}</p>
+
+          <div class="qty-row">
+            <span>Quantity</span>
+            <div class="stepper">
+              <button type="button" (click)="changeQuantity(-1)" [disabled]="quantity() <= 1" aria-label="Decrease">−</button>
+              <span>{{ quantity() }}</span>
+              <button type="button" (click)="changeQuantity(1)" [disabled]="quantity() >= 10" aria-label="Increase">+</button>
+            </div>
+          </div>
+
+          <div class="pay-chip">💵 Payment: <strong>Cash on Delivery</strong></div>
+
+          @if (error()) {
+            <div class="alert error" role="alert">{{ error() }}</div>
+          }
+
+          <button type="button" class="btn btn-primary btn-block" (click)="review()" [disabled]="busy()">
+            @if (busy()) { <span class="spinner"></span> Preparing your bill… } @else { Review bill }
+          </button>
+        </div>
+      }
+    }
+
+    @case ('review') {
+      @if (preview(); as p) {
+        <div class="panel">
+          <div class="panel-title">
+            <button type="button" class="btn btn-ghost btn-sm" (click)="back()" [disabled]="busy()">← Change</button>
+            <span class="provider" [attr.data-provider]="p.cart.provider">{{ p.cart.providerName }}</span>
+          </div>
+
+          <h3>Confirm your order</h3>
+          <p class="sub">{{ p.cart.restaurantName }}</p>
+
+          <dl class="bill">
+            @for (line of p.cart.items; track $index) {
+              <div><dt>{{ line.name }} × {{ line.quantity }}</dt><dd>{{ line.total | currency: 'INR' }}</dd></div>
+            }
+            <div class="sep"><dt>Item total</dt><dd>{{ p.cart.itemTotal | currency: 'INR' }}</dd></div>
+            <div><dt>Delivery fee</dt><dd>{{ p.cart.deliveryFee | currency: 'INR' }}</dd></div>
+            <div><dt>Taxes &amp; charges</dt><dd>{{ p.cart.taxes | currency: 'INR' }}</dd></div>
+            @if (p.cart.discount > 0) {
+              <div class="discount"><dt>Discount</dt><dd>− {{ p.cart.discount | currency: 'INR' }}</dd></div>
+            }
+            <div class="total"><dt>To pay (cash)</dt><dd>{{ p.cart.toPay | currency: 'INR' }}</dd></div>
+          </dl>
+
+          <div class="field">
+            <label for="note">Note for the restaurant (optional)</label>
+            <input id="note" class="input" maxlength="200" placeholder="e.g. Less spicy please"
+                   [ngModel]="note()" (ngModelChange)="note.set($event)" />
+          </div>
+
+          <div class="pay-chip">💵 Pay <strong>{{ p.cart.toPay | currency: 'INR' }}</strong> in cash when it arrives. Delivered to your default {{ p.cart.providerName }} address.</div>
+
+          @if (error()) {
+            <div class="alert error" role="alert">{{ error() }}</div>
+          }
+
+          <button type="button" class="btn btn-primary btn-block" (click)="placeOrder()" [disabled]="busy()">
+            @if (busy()) { <span class="spinner"></span> Placing order… } @else { Place order · Cash on Delivery }
+          </button>
+          <p class="fine">By placing the order you authorise Orvanta to submit it to {{ p.cart.providerName }} on your behalf.</p>
+        </div>
+      }
+    }
+
+    @case ('done') {
+      @if (confirmation(); as c) {
+        <div class="panel success">
+          <div class="check">✓</div>
+          <h3>Order placed!</h3>
+          <p class="sub">{{ c.message }}</p>
+          <dl class="bill compact">
+            <div><dt>Item</dt><dd>{{ c.itemName }} × {{ c.quantity }}</dd></div>
+            <div><dt>Restaurant</dt><dd>{{ c.restaurantName }}</dd></div>
+            @if (c.providerOrderId) {
+              <div><dt>Order ID</dt><dd>{{ c.providerOrderId }}</dd></div>
+            }
+            <div class="total"><dt>Pay on delivery</dt><dd>{{ c.totalAmount | currency: 'INR' }}</dd></div>
+          </dl>
+        </div>
+      }
+    }
+  }
+</section>

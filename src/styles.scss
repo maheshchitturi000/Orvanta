@@ -1,1 +1,412 @@
-/* You can add global styles to this file, and also import other style files */
+/* ==========================================================================
+   Orvanta AI design system: white + lavender
+   Tokens live here; components use the shared classes below and keep their
+   own stylesheets for layout only.
+   ========================================================================== */
+
+:root {
+  --white: #ffffff;
+  --lavender-25: #fcfbff;
+  --lavender-50: #f7f5ff;
+  --lavender-100: #efebff;
+  --lavender-200: #e2dbff;
+  --lavender-300: #c9bcff;
+  --lavender-400: #a993ff;
+  --lavender-500: #8b6cff;
+  --lavender-600: #7c5cff;
+  --lavender-700: #6343e0;
+  --lavender-800: #4b30b0;
+  --lavender-900: #2a1b66;
+
+  --text: #1d1636;
+  --text-muted: #6e6790;
+  --text-subtle: #9d97b8;
+  --border: #ece8f8;
+  --border-strong: #ddd6f3;
+
+  --success: #12a150;
+  --success-bg: #ecfbf2;
+  --danger: #d93a4a;
+  --danger-bg: #fff1f2;
+  --warning: #b7791f;
+  --warning-bg: #fff8eb;
+
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --shadow-sm: 0 1px 2px rgba(42, 27, 102, 0.06);
+  --shadow: 0 8px 24px rgba(99, 67, 224, 0.08);
+  --shadow-lg: 0 24px 60px rgba(99, 67, 224, 0.14);
+  --focus-ring: 0 0 0 4px rgba(124, 92, 255, 0.18);
+
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--white);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--lavender-700);
+  text-decoration: none;
+  font-weight: 500;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.05s ease;
+  white-space: nowrap;
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &.btn-sm {
+    height: 34px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  &.btn-block {
+    width: 100%;
+  }
+}
+
+.btn-primary {
+  background: var(--lavender-600);
+  color: var(--white);
+  box-shadow: 0 6px 16px rgba(124, 92, 255, 0.28);
+
+  &:hover:not(:disabled) {
+    background: var(--lavender-700);
+  }
+}
+
+.btn-outline {
+  background: var(--white);
+  color: var(--lavender-700);
+  border-color: var(--lavender-200);
+
+  &:hover:not(:disabled) {
+    background: var(--lavender-50);
+    border-color: var(--lavender-300);
+  }
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+
+  &:hover:not(:disabled) {
+    background: var(--lavender-50);
+    color: var(--lavender-700);
+  }
+}
+
+.btn-danger-ghost {
+  background: transparent;
+  color: var(--danger);
+
+  &:hover:not(:disabled) {
+    background: var(--danger-bg);
+  }
+}
+
+/* ---------- Forms ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .hint {
+    font-size: 12px;
+    color: var(--text-subtle);
+  }
+}
+
+.input {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--white);
+  color: var(--text);
+  font: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &::placeholder {
+    color: var(--text-subtle);
+  }
+
+  &:hover {
+    border-color: var(--lavender-300);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--lavender-500);
+    box-shadow: var(--focus-ring);
+  }
+
+  &.invalid {
+    border-color: var(--danger);
+    background: #fffafb;
+  }
+}
+
+.input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  .input {
+    padding-right: 72px;
+  }
+
+  .input-action {
+    position: absolute;
+    right: 6px;
+    height: 34px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--lavender-700);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--lavender-50);
+    }
+  }
+}
+
+.prefix-group {
+  display: flex;
+  align-items: stretch;
+
+  .prefix {
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    border: 1px solid var(--border-strong);
+    border-right: 0;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    background: var(--lavender-50);
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .input {
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+}
+
+.error-text {
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+
+  input {
+    width: 18px;
+    height: 18px;
+    margin: 1px 0 0;
+    accent-color: var(--lavender-600);
+    flex-shrink: 0;
+  }
+}
+
+/* ---------- Surfaces ---------- */
+
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--lavender-100);
+  color: var(--lavender-700);
+
+  &.success {
+    background: var(--success-bg);
+    color: var(--success);
+  }
+
+  &.muted {
+    background: #f3f2f7;
+    color: var(--text-muted);
+  }
+
+  &.warning {
+    background: var(--warning-bg);
+    color: var(--warning);
+  }
+}
+
+.alert {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.45;
+  border: 1px solid transparent;
+
+  &.error {
+    background: var(--danger-bg);
+    border-color: #ffd9de;
+    color: #9f1d2b;
+  }
+
+  &.success {
+    background: var(--success-bg);
+    border-color: #c8f0d8;
+    color: #0c6b37;
+  }
+
+  &.info {
+    background: var(--lavender-50);
+    border-color: var(--lavender-200);
+    color: var(--lavender-800);
+  }
+
+  &.warning {
+    background: var(--warning-bg);
+    border-color: #fde7bf;
+    color: #7a5212;
+  }
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: orv-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes orv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--lavender-500), var(--lavender-700));
+  color: var(--white);
+  font-weight: 700;
+  font-size: 17px;
+  box-shadow: 0 6px 14px rgba(124, 92, 255, 0.3);
+}
+
+.brand-name {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+
+  span {
+    color: var(--lavender-600);
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}

@@ -1,0 +1,55 @@
+<app-auth-shell heading="Verify your email" [subheading]="'We sent a code to ' + email()">
+  <div class="verify">
+    @if (verified()) {
+      <div class="alert success" role="status">✓ {{ infoMessage() }} Redirecting to sign in…</div>
+    } @else {
+      <div class="alert info">{{ infoMessage() }}</div>
+    }
+
+    @if (errorMessage()) {
+      <div class="alert error" role="alert">{{ errorMessage() }}</div>
+    }
+
+    <div class="otp" (paste)="onPaste($event)" role="group" aria-label="6-digit verification code">
+      @for (digit of digits(); track $index) {
+        <input
+          #box
+          class="otp-box"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          maxlength="6"
+          [attr.aria-label]="'Digit ' + ($index + 1)"
+          [value]="digit"
+          [class.filled]="!!digit"
+          [disabled]="verifying() || verified()"
+          (input)="onInput($index, $event)"
+          (keydown)="onKeydown($index, $event)" />
+      }
+    </div>
+
+    <button type="button" class="btn btn-primary btn-block" (click)="verify()"
+            [disabled]="!complete() || verifying() || verified()">
+      @if (verifying()) {
+        <span class="spinner"></span> Verifying…
+      } @else {
+        Verify email
+      }
+    </button>
+
+    <div class="resend">
+      <span>Didn't get it? Check spam, or</span>
+      <button type="button" class="link-button" (click)="resend()" [disabled]="resendIn() > 0 || resending() || verified()">
+        @if (resendIn() > 0) {
+          resend in {{ resendIn() }}s
+        } @else if (resending()) {
+          sending…
+        } @else {
+          resend code
+        }
+      </button>
+    </div>
+
+    <p class="switch"><a routerLink="/register">Use a different email</a> · <a routerLink="/login">Back to sign in</a></p>
+  </div>
+</app-auth-shell>

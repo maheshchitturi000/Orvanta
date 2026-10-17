@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/Orvanta.Shared/Orvanta.Shared.csproj" />
+  </Folder>
+  <Folder Name="/src/Gateway/">
+    <Project Path="src/Gateway/Orvanta.Gateway/Orvanta.Gateway.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/">
+    <Project Path="src/Services/Orvanta.AIService/Orvanta.AIService.csproj" />
+    <Project Path="src/Services/Orvanta.AuthService/Orvanta.AuthService.csproj" />
+    <Project Path="src/Services/Orvanta.ConversationService/Orvanta.ConversationService.csproj" />
+    <Project Path="src/Services/Orvanta.FoodService/Orvanta.FoodService.csproj" />
+    <Project Path="src/Services/Orvanta.IntegrationService/Orvanta.IntegrationService.csproj" />
+    <Project Path="src/Services/Orvanta.VoiceService/Orvanta.VoiceService.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Orvanta.UnitTests/Orvanta.UnitTests.csproj" />
+  </Folder>
+</Solution>
