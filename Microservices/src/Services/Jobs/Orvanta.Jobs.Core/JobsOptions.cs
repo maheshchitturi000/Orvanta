@@ -83,10 +83,13 @@ public sealed class AdzunaOptions
 
 public sealed class LlmOptions
 {
-    /// <summary>"ollama" (local) or "none" (heuristics/templates only).</summary>
+    /// <summary>"ollama" (local), "openai" (any OpenAI-compatible API, e.g. Groq or Gemini) or "none" (heuristics/templates only).</summary>
     public string Provider { get; set; } = "ollama";
     public string BaseUrl { get; set; } = "http://localhost:11434/";
     public string Model { get; set; } = "qwen3:4b";
+
+    /// <summary>Bearer key for "openai" providers; empty for Ollama.</summary>
+    public string ApiKey { get; set; } = string.Empty;
     public int TimeoutSeconds { get; set; } = 120;
 }
 

@@ -4,13 +4,14 @@ GO
 -- ConversationRepository.CreateConversationAsync
 CREATE OR ALTER PROCEDURE dbo.usp_Conversations_Create
     @ConversationId UNIQUEIDENTIFIER,
+    @UserId         UNIQUEIDENTIFIER,
     @Title          NVARCHAR(200)
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO dbo.Conversations (ConversationId, Title, CreatedAt, UpdatedAt)
+    INSERT INTO dbo.Conversations (ConversationId, UserId, Title, CreatedAt, UpdatedAt)
     OUTPUT INSERTED.ConversationId
-    VALUES (@ConversationId, @Title, SYSUTCDATETIME(), SYSUTCDATETIME());
+    VALUES (@ConversationId, @UserId, @Title, SYSUTCDATETIME(), SYSUTCDATETIME());
 END
 GO

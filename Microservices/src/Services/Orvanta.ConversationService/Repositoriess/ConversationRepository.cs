@@ -19,6 +19,7 @@ public sealed class ConversationRepository : IConversationRepository
     }
 
     public async Task<Guid> CreateConversationAsync(
+        Guid userId,
         string title,
         CancellationToken cancellationToken)
     {
@@ -26,11 +27,12 @@ public sealed class ConversationRepository : IConversationRepository
 
         return await connection.ExecuteScalarAsync<Guid>(Procedure(
             "dbo.usp_Conversations_Create",
-            new { ConversationId = Guid.NewGuid(), Title = title },
+            new { ConversationId = Guid.NewGuid(), UserId = userId, Title = title },
             cancellationToken));
     }
 
     public async Task<bool> ConversationExistsAsync(
+        Guid userId,
         Guid conversationId,
         CancellationToken cancellationToken)
     {
@@ -38,7 +40,7 @@ public sealed class ConversationRepository : IConversationRepository
 
         return await connection.ExecuteScalarAsync<bool>(Procedure(
             "dbo.usp_Conversations_Exists",
-            new { ConversationId = conversationId },
+            new { ConversationId = conversationId, UserId = userId },
             cancellationToken));
     }
 
@@ -55,13 +57,14 @@ public sealed class ConversationRepository : IConversationRepository
     }
 
     public async Task<IEnumerable<Conversation>> GetConversationsAsync(
+        Guid userId,
         CancellationToken cancellationToken)
     {
         using var connection = _connectionFactory.CreateConnection();
 
         return await connection.QueryAsync<Conversation>(Procedure(
             "dbo.usp_Conversations_List",
-            null,
+            new { UserId = userId },
             cancellationToken));
     }
 

@@ -89,7 +89,8 @@ function Get-TableOrder {
 Write-Host "== $Database on $Server" -ForegroundColor Cyan
 
 # SQL Express creates databases with AUTO_CLOSE ON, which adds multi-second delays after idle periods.
-Invoke-Sql -Db 'master' -Query "IF DB_ID(N'$Database') IS NULL CREATE DATABASE [$Database]; ALTER DATABASE [$Database] SET AUTO_CLOSE OFF;"
+# Azure SQL (EngineEdition 5) databases are created by infra/main.bicep and don't support AUTO_CLOSE, so skip both there.
+Invoke-Sql -Db 'master' -Query "IF CAST(SERVERPROPERTY('EngineEdition') AS INT) <> 5 BEGIN IF DB_ID(N'$Database') IS NULL CREATE DATABASE [$Database]; EXEC(N'ALTER DATABASE [$Database] SET AUTO_CLOSE OFF'); END"
 
 foreach ($stage in $stages) {
     $dir = Join-Path $source $stage

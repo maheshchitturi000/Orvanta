@@ -15,6 +15,7 @@ public sealed class ConversationService : IConversationService
     }
 
     public Task<Guid> CreateConversationAsync(
+        Guid userId,
         string title,
         CancellationToken cancellationToken)
     {
@@ -22,10 +23,11 @@ public sealed class ConversationService : IConversationService
             throw new ArgumentException("Title is required.", nameof(title));
 
         return _repository.CreateConversationAsync(
-            title.Trim(), cancellationToken);
+            userId, title.Trim(), cancellationToken);
     }
 
     public async Task<bool> SaveMessageAsync(
+        Guid userId,
         Guid conversationId,
         string role,
         string content,
@@ -38,7 +40,7 @@ public sealed class ConversationService : IConversationService
             throw new ArgumentException("Invalid message role.");
 
         if (!await _repository.ConversationExistsAsync(
-                conversationId, cancellationToken))
+                userId, conversationId, cancellationToken))
             return false;
 
         var message = new ChatMessage
@@ -53,17 +55,19 @@ public sealed class ConversationService : IConversationService
     }
 
     public Task<IEnumerable<Conversation>> GetConversationsAsync(
+        Guid userId,
         CancellationToken cancellationToken)
     {
-        return _repository.GetConversationsAsync(cancellationToken);
+        return _repository.GetConversationsAsync(userId, cancellationToken);
     }
 
     public async Task<IEnumerable<ChatMessage>> GetMessagesAsync(
+        Guid userId,
         Guid conversationId,
         CancellationToken cancellationToken)
     {
         if (!await _repository.ConversationExistsAsync(
-                conversationId, cancellationToken))
+                userId, conversationId, cancellationToken))
             throw new KeyNotFoundException("Conversation not found.");
 
         return await _repository.GetMessagesAsync(

@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Orvanta.Shared.Extensions;
 using Orvanta.Shared.Responses;
 
@@ -30,11 +31,20 @@ builder.Services.AddRateLimiter(options =>
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 
+// Behind the Azure Container Apps ingress the client IP arrives in X-Forwarded-For; the rate limits need it.
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    o.KnownIPNetworks.Clear();
+    o.KnownProxies.Clear();
+});
+
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 app.UseOrvantaRequestLogging();
 app.UseOrvantaExceptionHandling();
 app.UseCors("frontend");
@@ -42,5 +52,11 @@ app.UseRateLimiter();
 
 app.MapGet("/health", () => Results.Ok(ResponseCls.Ok("Gateway is running.")));
 app.MapReverseProxy();
+
+// Production image: the Angular app is copied into wwwroot, so the web app and the API share one origin
+// (the refresh cookie is SameSite=Strict). Every route renders on the client, so unknown paths get the shell.
+// In development wwwroot is empty and the app runs on `ng serve` instead.
+app.UseStaticFiles();
+app.MapFallbackToFile("index.csr.html");
 
 app.Run();

@@ -1,4 +1,4 @@
-
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Orvanta.Shared.Extensions;
@@ -7,17 +7,28 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddOrvantaLogging("ai-service");
 
 builder.Services.AddOpenApi();
+builder.Services.AddOrvantaJwtAuthentication(builder.Configuration);
 
-builder.Services.AddHttpClient("Ollama", client =>
+// "ollama": a local Ollama server (development).
+// "openai": any OpenAI-compatible chat API, e.g. Groq or Google Gemini free tiers (production).
+var llm = builder.Configuration.GetSection("Llm").Get<LlmSettings>() ?? new();
+
+builder.Services.AddHttpClient("Llm", client =>
 {
-    client.BaseAddress = new Uri("http://localhost:11434/");
-    client.Timeout = TimeSpan.FromMinutes(5);
+    client.BaseAddress = new Uri(llm.BaseUrl.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(llm.TimeoutSeconds);
+    if (!string.IsNullOrWhiteSpace(llm.ApiKey))
+    {
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", llm.ApiKey);
+    }
 });
 
 var app = builder.Build();
 
 app.UseOrvantaRequestLogging();
 app.UseOrvantaExceptionHandling();
+app.UseAuthentication();
+app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {
@@ -43,13 +54,15 @@ app.MapPost("/api/chat", async (
         });
     }
 
+    var openAi = llm.IsOpenAiCompatible;
+
     try
     {
-        var client = factory.CreateClient("Ollama");
+        var client = factory.CreateClient("Llm");
 
         var payload = new
         {
-            model = "qwen3:4b",
+            model = llm.Model,
             messages = new[]
             {
                 new
@@ -68,12 +81,12 @@ app.MapPost("/api/chat", async (
         };
 
         using var response = await client.PostAsJsonAsync(
-            "api/chat", payload, cancellationToken);
+            openAi ? "chat/completions" : "api/chat", payload, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
             return Results.Problem(
-                title : "Ollama request failed",
+                title: "The AI model request failed",
                 statusCode: StatusCodes.Status502BadGateway);
         }
 
@@ -81,10 +94,12 @@ app.MapPost("/api/chat", async (
             await response.Content.ReadAsStreamAsync(cancellationToken),
             cancellationToken: cancellationToken);
 
-        var reply = json.RootElement
-            .GetProperty("message")
-            .GetProperty("content")
-            .GetString();
+        // Ollama: { message: { content } }. OpenAI-compatible: { choices: [ { message: { content } } ] }.
+        var message = openAi
+            ? json.RootElement.GetProperty("choices")[0].GetProperty("message")
+            : json.RootElement.GetProperty("message");
+
+        var reply = message.GetProperty("content").GetString();
 
         return Results.Ok(new
         {
@@ -94,12 +109,23 @@ app.MapPost("/api/chat", async (
     catch (HttpRequestException)
     {
         return Results.Problem(
-            title: "Cannot connect to Ollama",
-            detail: "Check that Ollama is running at localhost:11434.",
+            title: "Cannot connect to the AI model",
+            detail: $"Check that the model server at {llm.BaseUrl} is reachable.",
             statusCode: StatusCodes.Status503ServiceUnavailable);
     }
-});
+}).RequireAuthorization("UserOnly");
 
 app.Run();
 
 public sealed record ChatRequest(string Message);
+
+public sealed class LlmSettings
+{
+    public string Provider { get; set; } = "ollama";
+    public string BaseUrl { get; set; } = "http://localhost:11434/";
+    public string Model { get; set; } = "qwen3:4b";
+    public string ApiKey { get; set; } = string.Empty;
+    public int TimeoutSeconds { get; set; } = 300;
+
+    public bool IsOpenAiCompatible => Provider.Equals("openai", StringComparison.OrdinalIgnoreCase);
+}

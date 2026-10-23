@@ -1,11 +1,14 @@
 ﻿
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orvanta.ConversationService.DTOs;
 using Orvanta.ConversationService.Interfaces;
+using Orvanta.Shared.Security;
 
 namespace Orvanta.ConversationService.Controllers;
 
 [ApiController]
+[Authorize(Policy = "UserOnly")]
 [Route("api/conversations")]
 public sealed class ConversationsController : ControllerBase
 {
@@ -25,7 +28,7 @@ public sealed class ConversationsController : ControllerBase
             return BadRequest(new { error = "Title is required." });
 
         var id = await _service.CreateConversationAsync(
-            request.Title, cancellationToken);
+            User.GetUserId(), request.Title, cancellationToken);
 
         return Created($"/api/conversations/{id}", new
         {
@@ -41,7 +44,7 @@ public sealed class ConversationsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var saved = await _service.SaveMessageAsync(
-            conversationId, request.Role, request.Content,
+            User.GetUserId(), conversationId, request.Role, request.Content,
             cancellationToken);
 
         return saved
@@ -54,7 +57,7 @@ public sealed class ConversationsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var conversations =
-            await _service.GetConversationsAsync(cancellationToken);
+            await _service.GetConversationsAsync(User.GetUserId(), cancellationToken);
 
         return Ok(conversations);
     }
@@ -67,7 +70,7 @@ public sealed class ConversationsController : ControllerBase
         try
         {
             var messages = await _service.GetMessagesAsync(
-                conversationId, cancellationToken);
+                User.GetUserId(), conversationId, cancellationToken);
 
             return Ok(messages);
         }

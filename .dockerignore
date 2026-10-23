@@ -1,0 +1,16 @@
+.git/
+.angular/
+.vscode/
+.claude/
+node_modules/
+dist/
+extension/
+infra/
+**/bin/
+**/obj/
+**/logs/
+**/*.user
+**/local.settings.json
+**/appsettings.Development.json
+Microservices/Database/
+Microservices/tests/

@@ -10,6 +10,7 @@ builder.AddOrvantaLogging("conversation-service");
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddOrvantaJwtAuthentication(builder.Configuration);
 
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddScoped<IConversationRepository, ConversationRepository>();
@@ -24,6 +25,9 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new

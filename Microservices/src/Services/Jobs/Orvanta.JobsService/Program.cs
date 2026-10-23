@@ -5,6 +5,7 @@ using Orvanta.Jobs.Core;
 using Orvanta.Jobs.Core.Data;
 using Orvanta.JobsService.Services;
 using Orvanta.Shared.Extensions;
+using Orvanta.Shared.Responses;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddOrvantaLogging("jobs-service");
@@ -37,5 +38,6 @@ app.UseAuthentication();
 app.UseOrvantaAuditing();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGet("/health", () => Results.Ok(ResponseCls.Ok("Jobs service is running.")));
 
 app.Run();

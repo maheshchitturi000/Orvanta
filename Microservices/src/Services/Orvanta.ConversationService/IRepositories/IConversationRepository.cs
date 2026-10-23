@@ -6,10 +6,12 @@ namespace Orvanta.ConversationService.IInterfaces;
 public interface IConversationRepository
 {
     Task<Guid> CreateConversationAsync(
+        Guid userId,
         string title,
         CancellationToken cancellationToken);
 
     Task<bool> ConversationExistsAsync(
+        Guid userId,
         Guid conversationId,
         CancellationToken cancellationToken);
 
@@ -18,6 +20,7 @@ public interface IConversationRepository
         CancellationToken cancellationToken);
 
     Task<IEnumerable<Conversation>> GetConversationsAsync(
+        Guid userId,
         CancellationToken cancellationToken);
 
     Task<IEnumerable<ChatMessage>> GetMessagesAsync(

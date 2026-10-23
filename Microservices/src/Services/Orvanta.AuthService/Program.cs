@@ -5,6 +5,7 @@ using Orvanta.AuthService.Notifications;
 using Orvanta.AuthService.Security;
 using Orvanta.AuthService.Services;
 using Orvanta.Shared.Extensions;
+using Orvanta.Shared.Responses;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddOrvantaLogging("auth-service");
@@ -13,7 +14,7 @@ builder.Services.AddOrvantaControllers();
 builder.Services.AddOrvantaJwtAuthentication(builder.Configuration);
 
 builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("Orvanta")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("Orvanta"), sql => sql.EnableRetryOnFailure(3)));
 
 builder.Services.Configure<AuthSecurityOptions>(builder.Configuration.GetSection(AuthSecurityOptions.SectionName));
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
@@ -67,5 +68,6 @@ app.UseAuthentication();
 app.UseOrvantaAuditing();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGet("/health", () => Results.Ok(ResponseCls.Ok("Auth service is running.")));
 
 app.Run();

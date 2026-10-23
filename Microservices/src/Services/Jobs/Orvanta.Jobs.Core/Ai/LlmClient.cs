@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -18,8 +19,11 @@ public interface ILlmClient
     Task<string?> CompleteAsync(string system, string user, bool json, CancellationToken ct);
 }
 
-/// <summary>Ollama chat API (https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion).</summary>
-public sealed class OllamaLlmClient(HttpClient http, IOptions<JobsOptions> options, ILogger<OllamaLlmClient> logger) : ILlmClient
+/// <summary>
+/// Chat completion against either Ollama ("ollama", https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion)
+/// or any OpenAI-compatible API ("openai": Groq, Google Gemini, OpenRouter...).
+/// </summary>
+public sealed class LlmClient(HttpClient http, IOptions<JobsOptions> options, ILogger<LlmClient> logger) : ILlmClient
 {
     // Circuit breaker shared by all instances: after a failure, skip the model for a while so
     // batches (e.g. 20 approved applications) fall back to templates instantly instead of each waiting.
@@ -28,7 +32,9 @@ public sealed class OllamaLlmClient(HttpClient http, IOptions<JobsOptions> optio
 
     private readonly LlmOptions _options = options.Value.Llm;
 
-    public bool IsEnabled => _options.Provider.Equals("ollama", StringComparison.OrdinalIgnoreCase);
+    private bool IsOpenAi => _options.Provider.Equals("openai", StringComparison.OrdinalIgnoreCase);
+
+    public bool IsEnabled => IsOpenAi || _options.Provider.Equals("ollama", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsBroken => DateTime.UtcNow.Ticks < Interlocked.Read(ref _brokenUntilTicks);
 
@@ -46,15 +52,20 @@ public sealed class OllamaLlmClient(HttpClient http, IOptions<JobsOptions> optio
         {
             ["model"] = _options.Model,
             ["stream"] = false,
-            ["think"] = false,
-            ["options"] = new JsonObject { ["temperature"] = 0.2 },
             ["messages"] = new JsonArray(
                 new JsonObject { ["role"] = "system", ["content"] = system },
                 new JsonObject { ["role"] = "user", ["content"] = user })
         };
-        if (json)
+        if (IsOpenAi)
         {
-            body["format"] = "json";
+            body["temperature"] = 0.2;
+            if (json) body["response_format"] = new JsonObject { ["type"] = "json_object" };
+        }
+        else
+        {
+            body["think"] = false;
+            body["options"] = new JsonObject { ["temperature"] = 0.2 };
+            if (json) body["format"] = "json";
         }
 
         try
@@ -62,7 +73,17 @@ public sealed class OllamaLlmClient(HttpClient http, IOptions<JobsOptions> optio
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
 
-            using var response = await http.PostAsJsonAsync(new Uri(new Uri(_options.BaseUrl), "api/chat"), body, cts.Token);
+            var baseUri = new Uri(_options.BaseUrl.TrimEnd('/') + "/");
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(baseUri, IsOpenAi ? "chat/completions" : "api/chat"))
+            {
+                Content = JsonContent.Create(body)
+            };
+            if (!string.IsNullOrWhiteSpace(_options.ApiKey))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+            }
+
+            using var response = await http.SendAsync(request, cts.Token);
             if (!response.IsSuccessStatusCode)
             {
                 Break($"HTTP {(int)response.StatusCode}");
@@ -70,7 +91,8 @@ public sealed class OllamaLlmClient(HttpClient http, IOptions<JobsOptions> optio
             }
 
             var reply = await response.Content.ReadFromJsonAsync<JsonElement>(cts.Token);
-            return reply.GetProperty("message").GetProperty("content").GetString();
+            var message = IsOpenAi ? reply.GetProperty("choices")[0].GetProperty("message") : reply.GetProperty("message");
+            return message.GetProperty("content").GetString();
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or KeyNotFoundException)
         {

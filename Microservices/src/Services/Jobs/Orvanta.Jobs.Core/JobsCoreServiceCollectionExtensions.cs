@@ -35,7 +35,7 @@ public static class JobsCoreServiceCollectionExtensions
         services.AddSingleton<IJobSearchSource, AdzunaSource>();
         services.AddScoped<JobSourceCredentials>();
 
-        services.AddHttpClient<ILlmClient, OllamaLlmClient>(c => c.Timeout = Timeout.InfiniteTimeSpan);
+        services.AddHttpClient<ILlmClient, LlmClient>(c => c.Timeout = Timeout.InfiniteTimeSpan);
         services.AddScoped<ProfileExtractor>();
 
         services.AddSingleton<IJobQueue, AzureStorageJobQueue>();

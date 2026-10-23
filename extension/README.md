@@ -10,6 +10,9 @@ On **Jobs → Applications**, **Apply now** asks how to apply (auto-submit or re
 approved jobs to this extension. If the extension is missing or switched off, the dialog shows how to turn it
 on and waits; as soon as it's enabled, applying starts by itself (no page refresh needed).
 
+**Production:** `node extension/build-production.mjs https://<your-orvanta-host>` writes `dist/extension` with every
+localhost URL replaced by your deployed address (see `docs/DEPLOYMENT.md`).
+
 How the app and the extension talk: `bridge.js` runs on the Orvanta site (`http://localhost:4200`) and answers
 `window.postMessage` pings / start requests from that page only. No tokens pass through it. When the extension
 starts, the service worker also injects the bridge into Orvanta tabs that are already open. If Chrome hasn't

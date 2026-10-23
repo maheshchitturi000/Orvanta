@@ -1,0 +1,176 @@
+# Builds the images, provisions Azure (infra/main.bicep), applies the database schema and publishes the
+# Azure Functions. Does nothing until the repository variable AZURE_RESOURCE_GROUP is set; see docs/DEPLOYMENT.md.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  images:
+    needs: ci
+    if: ${{ vars.AZURE_RESOURCE_GROUP != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: gateway
+            context: .
+            file: Dockerfile
+          - name: auth
+            project: src/Services/Orvanta.AuthService/Orvanta.AuthService.csproj
+            assembly: Orvanta.AuthService
+          - name: food
+            project: src/Services/Orvanta.FoodService/Orvanta.FoodService.csproj
+            assembly: Orvanta.FoodService
+          - name: jobs
+            project: src/Services/Jobs/Orvanta.JobsService/Orvanta.JobsService.csproj
+            assembly: Orvanta.JobsService
+          - name: ai
+            project: src/Services/Orvanta.AIService/Orvanta.AIService.csproj
+            assembly: Orvanta.AIService
+          - name: conversation
+            project: src/Services/Orvanta.ConversationService/Orvanta.ConversationService.csproj
+            assembly: Orvanta.ConversationService
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image repository (lowercase)
+        run: echo "IMAGE_REPO=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context || 'Microservices' }}
+          file: ${{ matrix.file || 'Microservices/Dockerfile' }}
+          build-args: |
+            PROJECT=${{ matrix.project }}
+            ASSEMBLY=${{ matrix.assembly }}
+          push: true
+          tags: ${{ env.IMAGE_REPO }}/orvanta-${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy:
+    needs: images
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Provision infrastructure and containers
+        env:
+          REGISTRY_USERNAME: ${{ github.repository_owner }}
+          REGISTRY_PASSWORD: ${{ secrets.GHCR_PULL_TOKEN }}
+          SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+          JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
+          JWT_ENCRYPTION_KEY: ${{ secrets.JWT_ENCRYPTION_KEY }}
+          PASSWORD_PEPPER: ${{ secrets.PASSWORD_PEPPER }}
+          OTP_HMAC_KEY: ${{ secrets.OTP_HMAC_KEY }}
+          DATA_PROTECTION_KEY: ${{ secrets.DATA_PROTECTION_KEY }}
+          JOBS_SECRETS_KEY: ${{ secrets.JOBS_SECRETS_KEY }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_USERNAME: ${{ vars.SMTP_USERNAME }}
+          SMTP_FROM_EMAIL: ${{ vars.SMTP_FROM_EMAIL }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://api.groq.com/openai/v1/' }}
+          LLM_MODEL: ${{ vars.LLM_MODEL || 'llama-3.1-8b-instant' }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          JSEARCH_API_KEY: ${{ secrets.JSEARCH_API_KEY }}
+          ADZUNA_APP_ID: ${{ vars.ADZUNA_APP_ID }}
+          ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+        run: |
+          LLM_PROVIDER=openai
+          [ -z "$LLM_API_KEY" ] && LLM_PROVIDER=none
+          az deployment group create \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "orvanta-${GITHUB_SHA::7}" \
+            --template-file infra/main.bicep \
+            --parameters \
+              imageTag="$GITHUB_SHA" \
+              imageRepository="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" \
+              registryUsername="$REGISTRY_USERNAME" \
+              registryPassword="$REGISTRY_PASSWORD" \
+              publicUrl="$PUBLIC_URL" \
+              sqlAdminPassword="$SQL_ADMIN_PASSWORD" \
+              jwtSigningKey="$JWT_SIGNING_KEY" \
+              jwtEncryptionKey="$JWT_ENCRYPTION_KEY" \
+              passwordPepper="$PASSWORD_PEPPER" \
+              otpHmacKey="$OTP_HMAC_KEY" \
+              dataProtectionKey="$DATA_PROTECTION_KEY" \
+              jobsSecretsKey="$JOBS_SECRETS_KEY" \
+              smtpHost="$SMTP_HOST" \
+              smtpUserName="$SMTP_USERNAME" \
+              smtpPassword="$SMTP_PASSWORD" \
+              smtpFromEmail="$SMTP_FROM_EMAIL" \
+              llmProvider="$LLM_PROVIDER" \
+              llmBaseUrl="$LLM_BASE_URL" \
+              llmModel="$LLM_MODEL" \
+              llmApiKey="$LLM_API_KEY" \
+              jsearchApiKey="$JSEARCH_API_KEY" \
+              adzunaAppId="$ADZUNA_APP_ID" \
+              adzunaAppKey="$ADZUNA_APP_KEY" \
+            --query properties.outputs -o json > outputs.json
+          echo "SQL_SERVER=$(jq -r .sqlServerName.value outputs.json)" >> "$GITHUB_ENV"
+          echo "SQL_FQDN=$(jq -r .sqlServerFqdn.value outputs.json)" >> "$GITHUB_ENV"
+          echo "FUNCTION_APP=$(jq -r .functionAppName.value outputs.json)" >> "$GITHUB_ENV"
+          echo "### App URL: $(jq -r .appUrl.value outputs.json)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open the SQL firewall for this runner
+        run: |
+          RUNNER_IP=$(curl -fsS https://api.ipify.org)
+          az sql server firewall-rule create -g "$RESOURCE_GROUP" -s "$SQL_SERVER" -n github-runner \
+            --start-ip-address "$RUNNER_IP" --end-ip-address "$RUNNER_IP" -o none
+
+      - name: Apply database schema
+        shell: pwsh
+        env:
+          SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+        run: |
+          if (-not (Get-Command sqlcmd -ErrorAction SilentlyContinue)) {
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq sqlcmd
+          }
+          ./Microservices/Database/Deploy-Database.ps1 -Server $env:SQL_FQDN -UserName orvantaadmin -Password $env:SQL_ADMIN_PASSWORD
+
+      - name: Close the SQL firewall
+        if: always()
+        run: az sql server firewall-rule delete -g "$RESOURCE_GROUP" -s "$SQL_SERVER" -n github-runner -o none || true
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish Azure Functions
+        run: dotnet publish Microservices/src/Services/Jobs/Orvanta.Jobs.Functions/Orvanta.Jobs.Functions.csproj -c Release -o functions-publish
+
+      - uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.FUNCTION_APP }}
+          package: functions-publish
+          sku: flexconsumption

@@ -7,7 +7,7 @@ Angular (4200) ──► Gateway :5095 (YARP, CORS, rate limits)
                      ├─ /api/auth/*          ──► AuthService          :5101  (SQL: Orvanta)
                      ├─ /api/integrations/*  ──► FoodService          :5077  (SQL: Orvanta)
                      ├─ /api/food/*          ──► FoodService          :5077 ──► Swiggy MCP / Zomato MCP
-                     ├─ /api/chat            ──► AIService            :5212 ──► Ollama (qwen3:4b)
+                     ├─ /api/chat            ──► AIService            :5212 ──► Ollama locally / Groq or Gemini in production
                      └─ /api/conversations/* ──► ConversationService  :5005  (SQL: Orvanta)
 ```
 
@@ -32,8 +32,8 @@ Microservices/
 │  └─ Services/
 │     ├─ Orvanta.AuthService           # register → email OTP → login, JWT, refresh tokens
 │     ├─ Orvanta.FoodService           # Swiggy + Zomato connections (OAuth), top-5 search, COD ordering
-│     ├─ Orvanta.AIService             # Ollama chat (existing)
-│     ├─ Orvanta.ConversationService   # chat history, Dapper + SQL Server (existing)
+│     ├─ Orvanta.AIService             # LLM chat: Ollama, or any OpenAI-compatible API (Llm:Provider = "openai")
+│     ├─ Orvanta.ConversationService   # chat history per user, Dapper + SQL Server
 │     ├─ Orvanta.VoiceService          # placeholder (existing template)
 │     └─ Orvanta.IntegrationService    # legacy Swiggy-only service, superseded by FoodService (port 5078, not routed)
 └─ tests/Orvanta.UnitTests
@@ -90,7 +90,7 @@ solutions…) or a core skill in the title missing from the CV keeps a job below
 - *Naukri* is not a source: it offers no API for other apps, and its terms forbid scraping. The Matches
   page only links to a Naukri search for the user's role.
 
-**AI is optional.** With Ollama running (`Jobs:Llm`), CVs are parsed and cover letters written by the
+**AI is optional.** With Ollama running, or `Jobs:Llm:Provider` = `openai` plus a Groq/Gemini key (`Jobs:Llm`), CVs are parsed and cover letters written by the
 local model. Without it, rule-based parsing and a template letter are used, so nothing breaks.
 
 **Why the extension, not a server bot:** LinkedIn and most job sites forbid automated submission, and
@@ -131,7 +131,7 @@ Services return `ServiceResult<T>` from business logic; `ApiControllerBase.Respo
 | Provider OAuth | OAuth 2.1 + PKCE (S256), one-time `state` stored hashed, RFC 8414 discovery, RFC 7591 dynamic client registration |
 | Account enumeration | Generic messages for unknown emails on login and resend; constant-time dummy hash |
 | Logging & audit | Warning/Error logs (incl. every unhandled exception, with the trace id shown to the user) in `OrvantaLogs.dbo.AppLogs`; every signed-in change and every auth event in `OrvantaLogs.dbo.AuditLogs`. See `Database/README.md` |
-| Authorization | `[Authorize(Policy = "UserOnly")]` on every food and integration endpoint; role claim supports `Admin` |
+| Authorization | `[Authorize(Policy = "UserOnly")]` on every food, integration, jobs, chat and conversation endpoint; conversations are filtered by the signed-in user (`Conversations.UserId`); role claim supports `Admin` |
 
 ### Secrets
 
@@ -145,7 +145,7 @@ $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create
 
 | Setting | Services | Notes |
 |---|---|---|
-| `Jwt:SigningKey` (≥32 bytes) / `Jwt:EncryptionKey` (32 bytes) | Auth, Food | Must be identical in both |
+| `Jwt:SigningKey` (≥32 bytes) / `Jwt:EncryptionKey` (32 bytes) | Auth, Food, Jobs, Conversation, AI | Must be identical in all of them |
 | `AuthSecurity:PasswordPepper`, `AuthSecurity:OtpHmacKey` | Auth | Changing the pepper invalidates all passwords |
 | `DataProtection:Key` (32 bytes) | Food | Changing it invalidates stored provider tokens |
 | `Smtp:*` | Auth | When `Smtp:Host` is empty, OTP emails are written to the AuthService console instead |

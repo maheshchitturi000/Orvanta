@@ -12,6 +12,7 @@ using Orvanta.FoodService.Options;
 using Orvanta.FoodService.Providers;
 using Orvanta.FoodService.Services;
 using Orvanta.Shared.Extensions;
+using Orvanta.Shared.Responses;
 using Orvanta.Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,7 +23,7 @@ builder.Services.AddOrvantaJwtAuthentication(builder.Configuration);
 builder.Services.AddMemoryCache();
 
 builder.Services.AddDbContext<FoodDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("Orvanta")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("Orvanta"), sql => sql.EnableRetryOnFailure(3)));
 
 builder.Services.Configure<FoodProvidersOptions>(builder.Configuration.GetSection(FoodProvidersOptions.SectionName));
 
@@ -79,5 +80,6 @@ app.UseAuthentication();
 app.UseOrvantaAuditing();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGet("/health", () => Results.Ok(ResponseCls.Ok("Food service is running.")));
 
 app.Run();
