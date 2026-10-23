@@ -21,6 +21,12 @@ public sealed class JwtOptions
     /// </summary>
     public string EncryptionKey { get; set; } = string.Empty;
 
+    /// <summary>Access token lifetime. The web app warns the user shortly before it runs out.</summary>
     public int AccessTokenMinutes { get; set; } = 15;
-    public int RefreshTokenDays { get; set; } = 7;
+
+    /// <summary>
+    /// Refresh token lifetime. Tokens rotate on every refresh, so this is an idle timeout: a session
+    /// nobody continues within this window ends and the user signs in again.
+    /// </summary>
+    public int RefreshTokenMinutes { get; set; } = 30;
 }

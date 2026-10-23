@@ -17,6 +17,15 @@
   color: #1d1636;
 }
 
+#orvanta-banner.orv-attention {
+  border-color: #f5c2c7;
+  box-shadow: 0 24px 60px rgba(217, 58, 74, 0.22);
+}
+
+#orvanta-banner.orv-attention .orv-brand {
+  background: linear-gradient(135deg, #ef5a69, #d93a4a);
+}
+
 #orvanta-banner .orv-brand {
   display: grid;
   place-items: center;

@@ -1,0 +1,102 @@
+<div class="scrim" (click)="close()" aria-hidden="true"></div>
+
+<div #dialog class="dialog" role="dialog" aria-modal="true" aria-labelledby="apply-title" tabindex="-1">
+  <button type="button" class="x" (click)="close()" aria-label="Close"><app-icon name="x" [size]="18" /></button>
+
+  @switch (step()) {
+    @case ('choose') {
+      <span class="hero"><app-icon name="send" [size]="22" /></span>
+      <h2 id="apply-title">Apply to {{ ready() }} {{ ready() === 1 ? 'job' : 'jobs' }}</h2>
+
+      <div class="modes" role="radiogroup" aria-label="How to apply">
+        <button type="button" class="mode" role="radio" [attr.aria-checked]="autoSubmit()" [class.on]="autoSubmit()"
+                (click)="autoSubmit.set(true)">
+          <span class="radio"></span>
+          <span>
+            <strong>Auto-submit</strong>
+            <small>Orvanta fills and submits each application. It stops and asks you when a question needs you.</small>
+          </span>
+        </button>
+        <button type="button" class="mode" role="radio" [attr.aria-checked]="!autoSubmit()" [class.on]="!autoSubmit()"
+                (click)="autoSubmit.set(false)">
+          <span class="radio"></span>
+          <span>
+            <strong>I'll review and submit</strong>
+            <small>Orvanta fills each form; you check it and press Submit.</small>
+          </span>
+        </button>
+      </div>
+
+      @if (autoSubmit()) {
+        <label class="ack">
+          <input type="checkbox" [checked]="acknowledged()" (change)="acknowledged.set($any($event.target).checked)" />
+          <span>I understand LinkedIn and Naukri don't allow automated applying and may restrict my account.</span>
+        </label>
+      }
+
+      <button type="button" class="btn btn-primary btn-block" (click)="start()" [disabled]="!canStart()">
+        Start applying
+      </button>
+    }
+
+    @case ('checking') {
+      <div class="state"><span class="spinner big"></span><p>Checking the Orvanta extension…</p></div>
+    }
+
+    @case ('enable') {
+      <span class="hero warn"><app-icon name="plug" [size]="22" /></span>
+      <h2 id="apply-title">Turn on the Orvanta extension</h2>
+
+      @if (!browserSupported) {
+        <div class="alert warning"><app-icon name="alert" [size]="16" /> Applying needs Chrome or Edge. Open Orvanta there.</div>
+      }
+
+      <ol class="steps">
+        <li>
+          Open
+          <button type="button" class="code" (click)="copyExtensionsPage()" title="Copy">
+            {{ extensionsPage }} <app-icon [name]="copied() ? 'check' : 'file'" [size]="13" />
+          </button>
+          in a new tab.@if (copied()) { <small class="copied">Copied</small> }
+        </li>
+        <li>Switch <strong>Orvanta AI – Job Apply Assistant</strong> on.</li>
+        <li>Come back here. Applying starts automatically.</li>
+      </ol>
+      <details class="install">
+        <summary>Not in the list?</summary>
+        Turn on <strong>Developer mode</strong> (top right), click <strong>Load unpacked</strong> and choose the
+        <code>extension</code> folder of the Orvanta project.
+      </details>
+
+      <div class="waiting" role="status"><span class="spinner"></span> Waiting for the extension…</div>
+    }
+
+    @case ('starting') {
+      <div class="state"><span class="spinner big"></span><p>Starting…</p></div>
+    }
+
+    @case ('started') {
+      <span class="hero ok"><app-icon name="check" [size]="22" /></span>
+      <h2 id="apply-title">Applying to {{ started() }} {{ started() === 1 ? 'job' : 'jobs' }}</h2>
+      <p class="lead">
+        The first job opened in a new tab.
+        {{ autoSubmit() ? 'Orvanta submits each one and asks you if a question needs you.' : 'Review each form and press Submit.' }}
+      </p>
+      <button type="button" class="btn btn-primary btn-block" (click)="close()">Done</button>
+    }
+
+    @case ('permission') {
+      <span class="hero"><app-icon name="shield" [size]="22" /></span>
+      <h2 id="apply-title">One more step</h2>
+      <p class="lead">In the tab that just opened, click <strong>Allow &amp; start applying</strong>.</p>
+      <button type="button" class="btn btn-outline btn-block" (click)="close()">OK</button>
+    }
+
+    @case ('error') {
+      <span class="hero bad"><app-icon name="alert" [size]="22" /></span>
+      <h2 id="apply-title">Couldn't start</h2>
+      <p class="lead">{{ error() }}</p>
+      <button type="button" class="btn btn-primary btn-block" (click)="start()">Try again</button>
+    }
+  }
+</div>

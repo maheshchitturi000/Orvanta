@@ -2,7 +2,7 @@
   display: grid;
   grid-template-columns: minmax(380px, 5fr) 7fr;
   min-height: 100dvh;
-  background: var(--white);
+  background: var(--surface);
 }
 
 .showcase {
@@ -92,7 +92,7 @@
   height: 320px;
   right: -120px;
   top: 30%;
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9), rgba(169, 147, 255, 0.35));
+  background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--surface) 90%, transparent), rgba(169, 147, 255, 0.35));
 }
 
 .orb-two {
@@ -100,7 +100,7 @@
   height: 180px;
   left: -60px;
   bottom: -40px;
-  background: radial-gradient(circle at 40% 40%, rgba(255, 255, 255, 0.8), rgba(139, 108, 255, 0.25));
+  background: radial-gradient(circle at 40% 40%, color-mix(in srgb, var(--surface) 80%, transparent), rgba(139, 108, 255, 0.25));
 }
 
 .panel {

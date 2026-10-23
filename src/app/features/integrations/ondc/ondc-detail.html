@@ -1,0 +1,238 @@
+<div class="page">
+  <a class="back" routerLink="/integrations/food"><app-icon name="arrowLeft" [size]="15" /> Food &amp; delivery</a>
+
+  @if (item(); as p) {
+    <header class="card hero" data-id="ondc">
+      <app-integration-logo [entry]="p" [size]="64" />
+
+      <div class="hero-copy">
+        <div class="title-row">
+          <h2>{{ p.name }}</h2>
+          @if (network(); as n) {
+            @if (!n.enabled) {
+              <span class="badge muted">Off</span>
+            } @else if (n.mode === 'Sandbox') {
+              <span class="badge warning">Sandbox</span>
+            } @else {
+              <span class="badge success">● {{ n.mode }}</span>
+            }
+          }
+        </div>
+        <p>{{ p.tagline }}</p>
+      </div>
+    </header>
+
+    @if (network()?.mode === 'Sandbox') {
+      <div class="alert info" role="status">
+        <app-icon name="info" [size]="16" /> Sandbox: sample restaurants on a local test network. No real order is placed.
+      </div>
+    }
+    @if (networkError()) {
+      <div class="alert error" role="alert"><app-icon name="alert" [size]="16" /> {{ networkError() }}</div>
+    }
+
+    <div class="columns">
+      <div class="main">
+        <!-- Search -->
+        <section class="card panel" aria-labelledby="ondc-search-title">
+          <h3 id="ondc-search-title"><app-icon name="search" [size]="16" /> Search restaurants</h3>
+
+          <form class="search" (submit)="search($event)">
+            <input class="input" type="search" name="query" placeholder="Dish, e.g. biryani or dosa" maxlength="100"
+                   aria-label="Dish" [value]="query()" (input)="query.set($any($event.target).value)" />
+            <select class="input city" name="city" aria-label="City" [value]="city()" (change)="city.set($any($event.target).value)">
+              @for (c of cities; track c.code) {
+                <option [value]="c.code">{{ c.name }}</option>
+              }
+            </select>
+            <button type="submit" class="btn btn-primary" [disabled]="searching() || query().trim().length < 2 || network()?.enabled === false">
+              @if (searching()) { <span class="spinner"></span> Searching… } @else { Search }
+            </button>
+          </form>
+
+          @if (searchError()) {
+            <div class="alert error" role="alert">{{ searchError() }}</div>
+          } @else if (searching()) {
+            <p class="state"><span class="spinner"></span> Asking restaurants on ONDC…</p>
+          } @else if (searchNote()) {
+            <p class="state">{{ searchNote() }}</p>
+          } @else if (results(); as items) {
+            <ul class="dishes">
+              @for (dish of items; track dish.catalogItemId) {
+                <li class="dish">
+                  <span class="veg" [class.non]="dish.isVeg === false" [class.unknown]="dish.isVeg === null"
+                        [attr.title]="dish.isVeg === null ? null : dish.isVeg ? 'Veg' : 'Non-veg'"
+                        [attr.aria-label]="dish.isVeg === null ? null : dish.isVeg ? 'Veg' : 'Non-veg'"></span>
+                  <div class="dish-copy">
+                    <strong>{{ dish.itemName }}</strong>
+                    <span>{{ dish.providerName }}</span>
+                  </div>
+                  <span class="price">
+                    @if (dish.price !== null) { {{ dish.price | currency: dish.currency : 'symbol' : '1.0-2' }} }
+                  </span>
+                  <select class="input qty" aria-label="Quantity" [value]="qty(dish)" (change)="setQty(dish, $any($event.target).value)">
+                    @for (n of quantities; track n) { <option [value]="n">{{ n }}</option> }
+                  </select>
+                  <button type="button" class="btn btn-outline btn-sm" (click)="getQuote(dish)" [disabled]="quotingId() !== null">
+                    @if (quotingId() === dish.catalogItemId) { <span class="spinner"></span> } Order
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+
+        <!-- Checkout -->
+        @if (current(); as view) {
+          <section class="card panel checkout" aria-labelledby="ondc-order-title">
+            <div class="panel-head">
+              <div>
+                <h3 id="ondc-order-title"><app-icon name="food" [size]="16" /> {{ view.order.itemName }} × {{ view.order.quantity }}</h3>
+                <p>{{ view.order.providerName }}</p>
+              </div>
+              <span class="badge" [attr.data-state]="view.order.state">{{ view.order.state }}</span>
+            </div>
+
+            @if (orderError()) {
+              <div class="alert error" role="alert">{{ orderError() }}</div>
+            } @else if (orderNote()) {
+              <div class="alert info" role="status">{{ orderNote() }}</div>
+            }
+
+            @if (view.quoteLines.length) {
+              <table class="bill">
+                <caption class="sr-only">Price from the restaurant</caption>
+                <tbody>
+                  @for (line of view.quoteLines; track $index) {
+                    <tr><th scope="row">{{ line.title }}</th><td>{{ line.amount | currency: view.order.currency : 'symbol' : '1.2-2' }}</td></tr>
+                  }
+                </tbody>
+                @if (view.order.quoteTotal !== null) {
+                  <tfoot>
+                    <tr><th scope="row">Total · cash on delivery</th><td>{{ view.order.quoteTotal | currency: view.order.currency : 'symbol' : '1.2-2' }}</td></tr>
+                  </tfoot>
+                }
+              </table>
+            }
+
+            @if (canPlace()) {
+              <form class="delivery" [formGroup]="delivery" (ngSubmit)="place()">
+                <div class="field">
+                  <label for="ondc-name">Name</label>
+                  <input id="ondc-name" class="input" formControlName="name" autocomplete="name" [class.invalid]="showError('name')" />
+                </div>
+                <div class="field">
+                  <label for="ondc-phone">Mobile</label>
+                  <input id="ondc-phone" class="input" formControlName="phone" inputmode="numeric" maxlength="10" autocomplete="tel-national"
+                         [class.invalid]="showError('phone')" />
+                  @if (showError('phone')) { <span class="error-text">Enter a valid 10-digit mobile number.</span> }
+                </div>
+                <div class="field wide">
+                  <label for="ondc-address">Delivery address</label>
+                  <input id="ondc-address" class="input" formControlName="addressLine" autocomplete="street-address"
+                         placeholder="House, street, area" [class.invalid]="showError('addressLine')" />
+                </div>
+                <div class="field">
+                  <label for="ondc-city">City</label>
+                  <input id="ondc-city" class="input" formControlName="city" autocomplete="address-level2" [class.invalid]="showError('city')" />
+                </div>
+                <div class="field">
+                  <label for="ondc-pin">Pincode</label>
+                  <input id="ondc-pin" class="input" formControlName="areaCode" inputmode="numeric" maxlength="6" autocomplete="postal-code"
+                         [class.invalid]="showError('areaCode')" />
+                  @if (showError('areaCode')) { <span class="error-text">Pincode is 6 digits.</span> }
+                </div>
+                <div class="actions wide">
+                  <button type="button" class="btn btn-ghost" (click)="closeOrder()" [disabled]="placing()">Cancel</button>
+                  <button type="submit" class="btn btn-primary" [disabled]="placing()">
+                    @if (placing()) { <span class="spinner"></span> Placing order… } @else { Place order · Cash on delivery }
+                  </button>
+                </div>
+              </form>
+            } @else if (isPlaced()) {
+              <div class="placed">
+                <app-icon name="check" [size]="18" />
+                <div>
+                  <strong>Order placed</strong>
+                  <span>Pay {{ view.order.quoteTotal | currency: view.order.currency : 'symbol' : '1.2-2' }} in cash on delivery.
+                    Order #{{ (view.order.bppOrderId ?? '').slice(0, 8).toUpperCase() }}</span>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" (click)="refresh(view)" [disabled]="refreshing()">
+                  @if (refreshing()) { <span class="spinner"></span> } @else { <app-icon name="refresh" [size]="14" /> } Status
+                </button>
+              </div>
+            } @else {
+              <div class="actions">
+                <button type="button" class="btn btn-ghost btn-sm" (click)="closeOrder()">Close</button>
+              </div>
+            }
+          </section>
+        }
+
+        <!-- Recent orders -->
+        @if (orders().length) {
+          <section class="card panel" aria-labelledby="ondc-orders-title">
+            <h3 id="ondc-orders-title"><app-icon name="history" [size]="16" /> Your ONDC orders</h3>
+            <ul class="orders">
+              @for (o of orders(); track o.order.orderId) {
+                <li>
+                  <button type="button" class="order-row" (click)="open(o)" [class.active]="current()?.order?.orderId === o.order.orderId">
+                    <div>
+                      <strong>{{ o.order.itemName }} × {{ o.order.quantity }}</strong>
+                      <span>{{ o.order.providerName }} · {{ o.order.createdAtUtc | date: 'd MMM, h:mm a' }}</span>
+                    </div>
+                    @if (o.order.quoteTotal !== null) {
+                      <span class="price">{{ o.order.quoteTotal | currency: o.order.currency : 'symbol' : '1.0-2' }}</span>
+                    }
+                    <span class="badge" [attr.data-state]="o.order.state">{{ o.order.state }}</span>
+                  </button>
+                </li>
+              }
+            </ul>
+          </section>
+        }
+      </div>
+
+      <aside class="side">
+        <section class="card panel">
+          <h3><app-icon name="globe" [size]="15" /> Network</h3>
+          @if (network(); as n) {
+            <dl class="facts">
+              <dt>Mode</dt><dd>{{ n.mode }}</dd>
+              <dt>Buyer app ID</dt><dd>{{ n.subscriberId }}</dd>
+              <dt>Domain</dt><dd>Food &amp; beverage ({{ n.domain }})</dd>
+            </dl>
+            @if (!n.readyForNetwork) {
+              <details class="checklist">
+                <summary>Before going live</summary>
+                <ul>
+                  @for (c of n.checklist; track c.label) {
+                    <li [class.done]="c.done"><app-icon [name]="c.done ? 'check' : 'x'" [size]="13" /> {{ c.label }}</li>
+                  }
+                </ul>
+              </details>
+            }
+          } @else if (!networkError()) {
+            <p class="state"><span class="spinner"></span> Checking…</p>
+          }
+        </section>
+
+        <section class="card panel">
+          <h3>What Orvanta can do</h3>
+          <ul class="features">
+            @for (feature of p.features; track feature) {
+              <li><app-icon name="check" [size]="15" /> {{ feature }}</li>
+            }
+          </ul>
+        </section>
+
+        <section class="card panel security">
+          <h3><app-icon name="shield" [size]="15" /> Security</h3>
+          <p>Every message to and from restaurants is signed and verified against the ONDC registry.</p>
+        </section>
+      </aside>
+    </div>
+  } @else {
+    <div class="card skeleton"></div>
+  }
+</div>

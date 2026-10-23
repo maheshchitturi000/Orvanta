@@ -27,20 +27,14 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    // For production, generate EF Core migrations and apply them in the release pipeline.
-    using var scope = app.Services.CreateScope();
-    var database = scope.ServiceProvider.GetRequiredService<JobsDbContext>().Database;
-    await database.EnsureCreatedAsync();
-    await database.ExecuteSqlRawAsync(JobsDbContext.DevelopmentSchemaPatches);
-    await database.ExecuteSqlRawAsync("ALTER DATABASE CURRENT SET AUTO_CLOSE OFF");
-}
+// Tables, functions and procedures come from Microservices/Database (Deploy-Database.ps1, also run by
+// run-all.ps1). Every service shares the Orvanta database, so no service creates schema on its own.
 
 app.UseForwardedHeaders();
 app.UseOrvantaRequestLogging();
 app.UseOrvantaExceptionHandling();
 app.UseAuthentication();
+app.UseOrvantaAuditing();
 app.UseAuthorization();
 app.MapControllers();
 

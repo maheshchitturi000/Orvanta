@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Orvanta.AuthService.Contracts;
@@ -5,6 +6,7 @@ using Orvanta.AuthService.Data;
 using Orvanta.AuthService.Domain;
 using Orvanta.AuthService.Notifications;
 using Orvanta.AuthService.Security;
+using Orvanta.Shared.Auditing;
 using Orvanta.Shared.Responses;
 using Orvanta.Shared.Security;
 
@@ -21,6 +23,9 @@ public interface IAuthService
     Task<ServiceResult<IssuedSession>> RefreshAsync(string? refreshToken, ClientInfo client, CancellationToken ct);
     Task LogoutAsync(string? refreshToken, CancellationToken ct);
     Task<ServiceResult<UserProfile>> GetProfileAsync(Guid userId, CancellationToken ct);
+    Task<ServiceResult<OtpSentResult>> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken ct);
+    Task<ServiceResult<object>> VerifyResetCodeAsync(VerifyResetCodeRequest request, CancellationToken ct);
+    Task<ServiceResult<object>> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct);
 }
 
 public sealed class AuthService(
@@ -28,8 +33,10 @@ public sealed class AuthService(
     IPasswordHasher passwordHasher,
     ITokenService tokenService,
     IOtpService otpService,
+    IEmailSender emailSender,
     IOptions<AuthSecurityOptions> securityOptions,
     IOptions<JwtOptions> jwtOptions,
+    IAuditLogger audit,
     ILogger<AuthService> logger) : IAuthService
 {
     private const string InvalidCredentials = "Incorrect email or password.";
@@ -74,6 +81,7 @@ public sealed class AuthService(
 
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Registration started for user {UserId}", user.Id);
+        audit.Log("Auth.Register", true, user.Id, user.Email);
 
         var result = new RegisterResult(user.Id, user.Email, _security.OtpExpiryMinutes * 60, _security.OtpResendCooldownSeconds);
 
@@ -103,7 +111,7 @@ public sealed class AuthService(
             return ServiceResult<object>.Ok(new { verified = true }, "Your email is already verified. Please sign in.");
         }
 
-        var check = await otpService.VerifyAsync(user, request.Code.Trim(), ct);
+        var check = await otpService.VerifyAsync(user, request.Code.Trim(), OtpPurpose.EmailVerification, consume: true, ct);
         switch (check)
         {
             case OtpCheck.Expired:
@@ -119,6 +127,7 @@ public sealed class AuthService(
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation("Email verified for user {UserId}", user.Id);
+        audit.Log("Auth.EmailVerified", true, user.Id, user.Email);
         return ServiceResult<object>.Ok(new { verified = true }, "Email verified. You can now sign in.");
     }
 
@@ -155,12 +164,14 @@ public sealed class AuthService(
         {
             _dummyHash ??= passwordHasher.Hash(SecureHash.RandomToken(16));
             passwordHasher.Verify(request.Password, _dummyHash);
+            audit.Log("Auth.LoginFailed", false, userEmail: email, details: "Unknown email");
             return ServiceResult<IssuedSession>.Fail(401, InvalidCredentials);
         }
 
         if (user.LockoutEndUtc > now)
         {
             var minutes = (int)Math.Ceiling((user.LockoutEndUtc.Value - now).TotalMinutes);
+            audit.Log("Auth.LoginFailed", false, user.Id, user.Email, details: "Account locked");
             return ServiceResult<IssuedSession>.Fail(423, $"Too many failed attempts. Try again in {minutes} minute(s).");
         }
 
@@ -173,9 +184,11 @@ public sealed class AuthService(
                 user.FailedLoginCount = 0;
                 user.LockoutEndUtc = now.AddMinutes(_security.LockoutMinutes);
                 logger.LogWarning("User {UserId} locked out after repeated failed logins", user.Id);
+                audit.Log("Auth.Lockout", false, user.Id, user.Email, details: $"Locked for {_security.LockoutMinutes} minutes");
             }
 
             await db.SaveChangesAsync(ct);
+            audit.Log("Auth.LoginFailed", false, user.Id, user.Email, details: "Wrong password");
             return ServiceResult<IssuedSession>.Fail(401, InvalidCredentials);
         }
 
@@ -202,6 +215,7 @@ public sealed class AuthService(
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation("User {UserId} signed in", user.Id);
+        audit.Log("Auth.Login", true, user.Id, user.Email);
         return ServiceResult<IssuedSession>.Ok(issued, $"Welcome back, {user.FullName}!");
     }
 
@@ -232,6 +246,7 @@ public sealed class AuthService(
             // A rotated token was presented again: assume theft and end the whole session family.
             await RevokeFamilyAsync(stored.FamilyId, ct);
             logger.LogWarning("Refresh token reuse detected for user {UserId}; session family revoked", stored.UserId);
+            audit.Log("Auth.RefreshTokenReuse", false, stored.UserId, stored.User.Email, "Session", stored.FamilyId.ToString());
             return ServiceResult<IssuedSession>.Fail(401, "Your session has ended. Please sign in again.");
         }
 
@@ -248,6 +263,7 @@ public sealed class AuthService(
         }
         await db.SaveChangesAsync(ct);
 
+        audit.Log("Auth.SessionRefreshed", true, stored.UserId, stored.User.Email, "Session", stored.FamilyId.ToString());
         return ServiceResult<IssuedSession>.Ok(issued, "Session refreshed.");
     }
 
@@ -259,10 +275,12 @@ public sealed class AuthService(
         }
 
         var hash = SecureHash.Sha256(refreshToken);
-        var familyId = await db.RefreshTokens.Where(t => t.TokenHash == hash).Select(t => (Guid?)t.FamilyId).FirstOrDefaultAsync(ct);
-        if (familyId is not null)
+        var session = await db.RefreshTokens.Where(t => t.TokenHash == hash)
+            .Select(t => new { t.FamilyId, t.UserId }).FirstOrDefaultAsync(ct);
+        if (session is not null)
         {
-            await RevokeFamilyAsync(familyId.Value, ct);
+            await RevokeFamilyAsync(session.FamilyId, ct);
+            audit.Log("Auth.Logout", true, session.UserId, entityType: "Session", entityId: session.FamilyId.ToString());
         }
     }
 
@@ -274,17 +292,140 @@ public sealed class AuthService(
             : ServiceResult<UserProfile>.Ok(ToProfile(user));
     }
 
-    /// <summary>Issues and emails an OTP. Delivery failures are already logged with the SMTP reason by the sender.</summary>
-    private async Task<bool> TrySendOtpAsync(User user, CancellationToken ct)
+    public async Task<ServiceResult<OtpSentResult>> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken ct)
+    {
+        var email = Normalize(request.Email);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
+        var result = new OtpSentResult(email, _security.OtpExpiryMinutes * 60, _security.OtpResendCooldownSeconds);
+        const string message = "If an account exists for this email, we've sent a 6-digit code to reset your password.";
+
+        // Same answer for unknown, unverified and rate-limited accounts, so emails can't be probed.
+        if (user is null || !user.IsEmailVerified || await otpService.GetResendWaitSecondsAsync(user.Id, ct) > 0)
+        {
+            return ServiceResult<OtpSentResult>.Ok(result, message);
+        }
+
+        if (!await TrySendOtpAsync(user, ct, OtpPurpose.PasswordReset))
+        {
+            return ServiceResult<OtpSentResult>.Fail(502, "We couldn't send the email right now. Please try again in a minute.");
+        }
+
+        audit.Log("Auth.PasswordResetRequested", true, user.Id, user.Email);
+        return ServiceResult<OtpSentResult>.Ok(result, message);
+    }
+
+    /// <summary>Checks the code without using it up, so the user can then choose a new password.</summary>
+    public async Task<ServiceResult<object>> VerifyResetCodeAsync(VerifyResetCodeRequest request, CancellationToken ct)
+    {
+        var (user, failure) = await CheckResetCodeAsync(request.Email, request.Code, consume: false, ct);
+        return user is null
+            ? failure!
+            : ServiceResult<object>.Ok(new { verified = true }, "Code verified. Choose a new password.");
+    }
+
+    public async Task<ServiceResult<object>> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct)
+    {
+        var (user, failure) = await CheckResetCodeAsync(request.Email, request.Code, consume: false, ct);
+        if (user is null)
+        {
+            return failure!;
+        }
+
+        if (passwordHasher.Verify(request.NewPassword, user.PasswordHash) != PasswordVerification.Failed)
+        {
+            const string sameMessage = "Choose a password different from your current one.";
+            return ServiceResult<object>.Fail(400, sameMessage,
+                new Dictionary<string, string[]> { ["newPassword"] = [sameMessage] });
+        }
+
+        // Use the code up only now, so a rejected password doesn't burn it.
+        var (consumed, consumeFailure) = await CheckResetCodeAsync(request.Email, request.Code, consume: true, ct);
+        if (consumed is null)
+        {
+            return consumeFailure!;
+        }
+
+        user.PasswordHash = passwordHasher.Hash(request.NewPassword);
+        user.FailedLoginCount = 0;
+        user.LockoutEndUtc = null;
+        await db.SaveChangesAsync(ct);
+
+        // Whoever knew the old password is signed out everywhere.
+        var now = DateTime.UtcNow;
+        await db.RefreshTokens
+            .Where(t => t.UserId == user.Id && t.RevokedAtUtc == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAtUtc, now), ct);
+
+        logger.LogInformation("Password reset for user {UserId}", user.Id);
+        audit.Log("Auth.PasswordReset", true, user.Id, user.Email);
+        await TrySendPasswordChangedNoticeAsync(user, ct);
+
+        return ServiceResult<object>.Ok(new { reset = true }, "Your password has been updated. Sign in with your new password.");
+    }
+
+    /// <summary>Unknown emails get the same answer as wrong codes, so emails can't be probed.</summary>
+    private async Task<(User? User, ServiceResult<object>? Failure)> CheckResetCodeAsync(
+        string rawEmail, string code, bool consume, CancellationToken ct)
+    {
+        var email = Normalize(rawEmail);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
+        if (user is null || !user.IsEmailVerified)
+        {
+            return (null, ServiceResult<object>.Fail(400, "That code is incorrect or has expired."));
+        }
+
+        var check = await otpService.VerifyAsync(user, code.Trim(), OtpPurpose.PasswordReset, consume, ct);
+        if (check != OtpCheck.Valid)
+        {
+            audit.Log("Auth.PasswordResetCodeFailed", false, user.Id, user.Email, details: check.ToString());
+        }
+
+        return check switch
+        {
+            OtpCheck.Valid => (user, null),
+            OtpCheck.Expired => (null, ServiceResult<object>.Fail(400, "This code has expired. Request a new one.")),
+            OtpCheck.TooManyAttempts => (null, ServiceResult<object>.Fail(429, "Too many incorrect attempts. Request a new code.")),
+            _ => (null, ServiceResult<object>.Fail(400, "That code is incorrect. Please try again."))
+        };
+    }
+
+    /// <summary>Security notice. Failing to send it must not undo the reset.</summary>
+    private async Task TrySendPasswordChangedNoticeAsync(User user, CancellationToken ct)
     {
         try
         {
-            await otpService.IssueAndSendAsync(user, ct);
+            await emailSender.SendAsync(
+                user.Email,
+                "Your Orvanta AI password was changed",
+                $"""
+                <div style="font-family:Segoe UI,Arial,sans-serif;max-width:480px;margin:auto;padding:24px;border:1px solid #e9e3ff;border-radius:16px">
+                  <h2 style="color:#6d4aff;margin-top:0">Password changed</h2>
+                  <p>Hi {WebUtility.HtmlEncode(user.FullName)},</p>
+                  <p>The password for your Orvanta AI account was just changed, and you've been signed out on all devices.</p>
+                  <p style="color:#666">If this wasn't you, reset your password again right away from the sign-in page.</p>
+                </div>
+                """,
+                ct);
+        }
+        catch (EmailDeliveryException ex)
+        {
+            logger.LogWarning("Password-changed notice for user {UserId} was not delivered", user.Id);
+            audit.Log("Auth.EmailDeliveryFailed", false, user.Id, user.Email, details: $"PasswordChangedNotice: {ex.Message}");
+        }
+    }
+
+    /// <summary>Issues and emails an OTP. Delivery failures are already logged with the SMTP reason by the sender.</summary>
+    private async Task<bool> TrySendOtpAsync(User user, CancellationToken ct, string purpose = OtpPurpose.EmailVerification)
+    {
+        try
+        {
+            await otpService.IssueAndSendAsync(user, purpose, ct);
             return true;
         }
-        catch (EmailDeliveryException)
+        catch (EmailDeliveryException ex)
         {
-            logger.LogWarning("Verification email for user {UserId} was not delivered", user.Id);
+            logger.LogWarning("{Purpose} email for user {UserId} was not delivered", purpose, user.Id);
+            audit.Log("Auth.EmailDeliveryFailed", false, user.Id, user.Email, details: $"{purpose}: {ex.Message}");
             return false;
         }
     }
@@ -293,7 +434,7 @@ public sealed class AuthService(
     {
         var (accessToken, accessExpires) = tokenService.CreateAccessToken(user, familyId);
         var refreshToken = SecureHash.RandomToken();
-        var refreshExpires = DateTime.UtcNow.AddDays(_jwt.RefreshTokenDays);
+        var refreshExpires = DateTime.UtcNow.AddMinutes(_jwt.RefreshTokenMinutes);
 
         db.RefreshTokens.Add(new RefreshToken
         {

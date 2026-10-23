@@ -19,8 +19,11 @@
     <span class="dot"></span> Qwen3 · Local
   </span>
   @if (!page().hideConnect) {
-    <a class="btn btn-outline btn-sm" routerLink="/integrations">
-      <app-icon name="apps" [size]="15" /> Connect apps
+    <a class="btn btn-outline btn-sm connect" routerLink="/integrations">
+      <app-icon name="apps" [size]="15" /> <span>Connect apps</span>
     </a>
   }
+  <app-theme-switcher class="theme" [compact]="true" />
+  <span class="divider" aria-hidden="true"></span>
+  <app-user-menu />
 </div>

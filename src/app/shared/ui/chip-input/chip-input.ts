@@ -34,7 +34,7 @@ import { Icon } from '../icon/icon';
     .chips {
       display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
       min-height: 46px; padding: 6px 8px; cursor: text;
-      border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--white);
+      border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface);
       transition: border-color .15s ease, box-shadow .15s ease;
     }
     .chips:focus-within { border-color: var(--lavender-500); box-shadow: var(--focus-ring); }
@@ -51,7 +51,7 @@ import { Icon } from '../icon/icon';
     .suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
     .suggestions button {
       height: 26px; padding: 0 10px; border: 1px dashed var(--lavender-300); border-radius: 999px;
-      background: var(--white); color: var(--lavender-700); font: inherit; font-size: 12px; cursor: pointer;
+      background: var(--surface); color: var(--lavender-700); font: inherit; font-size: 12px; cursor: pointer;
     }
     .suggestions button:hover { background: var(--lavender-50); }
   `

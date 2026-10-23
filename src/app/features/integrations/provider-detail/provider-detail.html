@@ -1,0 +1,148 @@
+<div class="page">
+  <a class="back" routerLink="/integrations/food"><app-icon name="arrowLeft" [size]="15" /> Food &amp; delivery</a>
+
+  @if (flash(); as f) {
+    <div class="alert" [class.success]="f.kind === 'success'" [class.error]="f.kind === 'error'" role="status">
+      <app-icon [name]="f.kind === 'success' ? 'check' : 'alert'" [size]="16" /> {{ f.text }}
+    </div>
+  }
+
+  @if (item(); as p) {
+    <header class="card hero" [attr.data-id]="p.id">
+      <app-integration-logo [entry]="p" [size]="64" />
+
+      <div class="hero-copy">
+        <div class="title-row">
+          <h2>{{ p.name }}</h2>
+          @if (p.state === 'connected') {
+            <span class="badge success">● Connected</span>
+          } @else if (p.state === 'unavailable') {
+            <span class="badge muted">Unavailable</span>
+          } @else {
+            <span class="badge muted">Not connected</span>
+          }
+        </div>
+        <p>{{ p.tagline }}</p>
+        @if (p.connectedAt) {
+          <div class="meta"><span><app-icon name="clock" [size]="13" /> Connected {{ p.connectedAt | date: 'mediumDate' }}</span></div>
+        }
+      </div>
+
+      <div class="hero-actions">
+        @if (connected()) {
+          <button type="button" class="btn btn-danger-ghost btn-sm" (click)="confirmingDisconnect.set(true)"
+                  [disabled]="busy() || confirmingDisconnect()">
+            Disconnect
+          </button>
+        } @else {
+          <button type="button" class="btn btn-primary" (click)="connect()" [disabled]="p.state === 'unavailable' || busy()">
+            @if (busy()) {
+              <span class="spinner"></span> Opening {{ p.name }}…
+            } @else {
+              Connect {{ p.name }} <app-icon name="external" [size]="14" />
+            }
+          </button>
+        }
+      </div>
+    </header>
+
+    @if (confirmingDisconnect()) {
+      <div class="confirm" role="alertdialog" aria-label="Confirm disconnect">
+        <span>Disconnect {{ p.name }}? Orvanta will stop searching and ordering from it, and its tokens are deleted.</span>
+        <div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="confirmingDisconnect.set(false)" [disabled]="busy()">Cancel</button>
+          <button type="button" class="btn btn-danger btn-sm" (click)="disconnect()" [disabled]="busy()">
+            @if (busy()) { <span class="spinner"></span> } Disconnect
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (p.state === 'unavailable' && p.unavailableNote) {
+      <div class="alert info" role="status"><app-icon name="info" [size]="16" /> {{ p.unavailableNote }}</div>
+    }
+
+    <div class="columns">
+      <div class="main">
+        @if (connected()) {
+          <section class="card panel" aria-labelledby="addresses-title">
+            <div class="panel-head">
+              <div>
+                <h3 id="addresses-title"><app-icon name="mapPin" [size]="16" /> Delivery addresses</h3>
+                <p>Orvanta searches and delivers to your <strong>default</strong> address.</p>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" (click)="loadAddresses(p.id, true)" [disabled]="addressesLoading()">
+                <app-icon name="refresh" [size]="14" /> Sync from {{ p.name }}
+              </button>
+            </div>
+
+            @if (addressesLoading()) {
+              <p class="state"><span class="spinner"></span> Loading addresses…</p>
+            } @else if (addressesError()) {
+              <div class="alert error">{{ addressesError() }}</div>
+            } @else if (!addresses().length) {
+              <p class="state">No saved addresses. Add one in the {{ p.name }} app, then sync.</p>
+            } @else {
+              <ul class="addresses">
+                @for (a of addresses(); track a.id) {
+                  <li class="address" [class.default]="a.isDefault">
+                    <span class="pin"><app-icon name="mapPin" [size]="15" /></span>
+                    <div>
+                      <strong>{{ a.label || 'Address' }}</strong>
+                      <p>{{ a.addressLine || 'Address details unavailable' }}</p>
+                    </div>
+                    @if (a.isDefault) {
+                      <span class="badge">Default</span>
+                    } @else {
+                      <button type="button" class="btn btn-ghost btn-sm" (click)="makeDefault(a)">Make default</button>
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          </section>
+
+          <section class="card panel">
+            <h3><app-icon name="sparkles" [size]="16" /> Try it</h3>
+            <p class="hint">Ask the AI Assistant, e.g. <em>“order paneer biryani under ₹300”</em>.</p>
+            <a class="btn btn-outline btn-sm try" routerLink="/">Open AI Assistant</a>
+          </section>
+        } @else if (p.state !== 'unavailable') {
+          <section class="card panel">
+            <h3>How connecting works</h3>
+            <ol class="steps">
+              <li>Sign in on {{ p.name }}’s official page.</li>
+              <li>Approve access for Orvanta.</li>
+              <li>Pick your delivery address.</li>
+            </ol>
+          </section>
+        }
+      </div>
+
+      <aside class="side">
+        <section class="card panel">
+          <h3>What Orvanta can do</h3>
+          <ul class="features">
+            @for (feature of p.features; track feature) {
+              <li><app-icon name="check" [size]="15" /> {{ feature }}</li>
+            }
+          </ul>
+        </section>
+
+        <section class="card panel security">
+          <h3><app-icon name="shield" [size]="15" /> Security</h3>
+          <p>Orvanta never sees your {{ p.name }} password. Tokens are encrypted and deleted when you disconnect.</p>
+        </section>
+      </aside>
+    </div>
+  } @else if (!store.loaded() || store.loading()) {
+    <div class="card skeleton"></div>
+  } @else {
+    <div class="card not-found">
+      <app-icon name="apps" [size]="22" />
+      <h3>Integration not found</h3>
+      <p>“{{ provider() }}” isn’t a food app Orvanta supports.</p>
+      <a class="btn btn-outline btn-sm" routerLink="/integrations/all">All integrations</a>
+    </div>
+  }
+</div>

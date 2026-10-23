@@ -57,6 +57,42 @@ public sealed class LoginRequest
     public string Password { get; set; } = string.Empty;
 }
 
+public sealed class ForgotPasswordRequest
+{
+    [Required(ErrorMessage = "Email is required.")]
+    [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+    [StringLength(254)]
+    public string Email { get; set; } = string.Empty;
+}
+
+public sealed class VerifyResetCodeRequest
+{
+    [Required, EmailAddress] public string Email { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Enter the code sent to your email.")]
+    [RegularExpression(@"^\d{6}$", ErrorMessage = "The code is 6 digits.")]
+    public string Code { get; set; } = string.Empty;
+}
+
+public sealed class ResetPasswordRequest
+{
+    [Required, EmailAddress] public string Email { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Enter the code sent to your email.")]
+    [RegularExpression(@"^\d{6}$", ErrorMessage = "The code is 6 digits.")]
+    public string Code { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Password is required.")]
+    [StringLength(128, MinimumLength = 8, ErrorMessage = "Password must be 8-128 characters.")]
+    [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$",
+        ErrorMessage = "Password needs an uppercase letter, a lowercase letter, a number and a symbol.")]
+    public string NewPassword { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Please confirm your password.")]
+    [Compare(nameof(NewPassword), ErrorMessage = "Passwords do not match.")]
+    public string ConfirmPassword { get; set; } = string.Empty;
+}
+
 public sealed record RegisterResult(Guid UserId, string Email, int OtpExpiresInSeconds, int ResendAfterSeconds);
 
 public sealed record OtpSentResult(string Email, int OtpExpiresInSeconds, int ResendAfterSeconds);

@@ -15,6 +15,9 @@ $services = @(
     @{ Name = 'Gateway (5095)';             Path = 'src/Gateway/Orvanta.Gateway' }
 )
 
+# Databases first: tables, functions and stored procedures (idempotent, see Database/README.md).
+& (Join-Path $root 'Database/Deploy-Database.ps1')
+
 dotnet build (Join-Path $root 'Orvanta.slnx')
 if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
 

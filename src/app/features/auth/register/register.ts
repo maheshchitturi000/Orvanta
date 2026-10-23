@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -7,14 +7,14 @@ import { ApiError } from '../../../core/models/response-cls.model';
 import {
   applyServerErrors,
   matchFields,
-  passwordScore,
   strongPassword
 } from '../../../shared/validators/form.validators';
+import { PasswordStrength } from '../../../shared/ui/password-strength/password-strength';
 import { AuthShell } from '../auth-shell/auth-shell';
 
 @Component({
   selector: 'app-register',
-  imports: [ReactiveFormsModule, RouterLink, AuthShell],
+  imports: [ReactiveFormsModule, RouterLink, AuthShell, PasswordStrength],
   templateUrl: './register.html',
   styleUrl: './register.scss'
 })
@@ -40,20 +40,7 @@ export class Register {
     { validators: matchFields('password', 'confirmPassword') }
   );
 
-  private readonly passwordValue = toSignal(this.form.controls.password.valueChanges, { initialValue: '' });
-
-  readonly strength = computed(() => passwordScore(this.passwordValue()));
-  readonly strengthLabel = computed(() => ['Too weak', 'Weak', 'Fair', 'Good', 'Strong'][this.strength()]);
-
-  readonly passwordRules = computed(() => {
-    const value = this.passwordValue();
-    return [
-      { label: '8+ characters', ok: value.length >= 8 },
-      { label: 'Uppercase & lowercase', ok: /[A-Z]/.test(value) && /[a-z]/.test(value) },
-      { label: 'A number', ok: /\d/.test(value) },
-      { label: 'A symbol', ok: /[^A-Za-z\d]/.test(value) }
-    ];
-  });
+  protected readonly passwordValue = toSignal(this.form.controls.password.valueChanges, { initialValue: '' });
 
   showError(name: keyof typeof this.form.controls): boolean {
     const control = this.form.controls[name];

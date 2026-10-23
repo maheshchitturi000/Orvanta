@@ -10,6 +10,9 @@ public sealed class JobsOptions
     public int DefaultMatchThreshold { get; set; } = 80;
     public int MaxNewMatchesPerRun { get; set; } = 40;
 
+    /// <summary>A company board slower than this is skipped for the run (reported as unavailable), so it can't hold up a search.</summary>
+    public int BoardTimeoutSeconds { get; set; } = 15;
+
     /// <summary>Boards scanned when the user hasn't chosen any, as "provider:board".</summary>
     public List<string> DefaultBoards { get; set; } = [];
 
@@ -19,11 +22,13 @@ public sealed class JobsOptions
     public LlmOptions Llm { get; set; } = new();
 
     public JSearchOptions JSearch { get; set; } = new();
+
+    public AdzunaOptions Adzuna { get; set; } = new();
 }
 
 /// <summary>
-/// JSearch (Google for Jobs data via RapidAPI): listings published on LinkedIn, Naukri, Indeed,
-/// Glassdoor and company sites, in any country. Key goes in user-secrets: Jobs:JSearch:ApiKey.
+/// JSearch (Google for Jobs data via RapidAPI): listings published on LinkedIn, Indeed, Glassdoor,
+/// Foundit and company sites, in any country. Key goes in user-secrets: Jobs:JSearch:ApiKey.
 /// </summary>
 public sealed class JSearchOptions
 {
@@ -47,6 +52,33 @@ public sealed class JSearchOptions
     public int CacheHours { get; set; } = 6;
 
     public bool IsConfigured => Enabled && !string.IsNullOrWhiteSpace(ApiKey);
+}
+
+/// <summary>
+/// Adzuna's official job search API (developer.adzuna.com): listings aggregated from job boards and company
+/// sites in 19 countries, India included. Optional server-wide credentials go in user-secrets:
+/// Jobs:Adzuna:AppId and Jobs:Adzuna:AppKey; users can also connect their own.
+/// </summary>
+public sealed class AdzunaOptions
+{
+    public bool Enabled { get; set; } = true;
+    public string AppId { get; set; } = string.Empty;
+    public string AppKey { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = "https://api.adzuna.com/v1/api/jobs";
+
+    /// <summary>Market searched when a query has no location (ISO code, lower case).</summary>
+    public string DefaultCountry { get; set; } = "in";
+
+    /// <summary>Results per search (Adzuna allows up to 50).</summary>
+    public int ResultsPerPage { get; set; } = 50;
+
+    /// <summary>Only listings posted within this many days.</summary>
+    public int MaxDaysOld { get; set; } = 14;
+
+    public bool IsConfigured => Enabled && !string.IsNullOrWhiteSpace(AppId) && !string.IsNullOrWhiteSpace(AppKey);
+
+    /// <summary>Credentials as stored for a connection: "appId:appKey".</summary>
+    public string? ServerCredential => IsConfigured ? $"{AppId.Trim()}:{AppKey.Trim()}" : null;
 }
 
 public sealed class LlmOptions

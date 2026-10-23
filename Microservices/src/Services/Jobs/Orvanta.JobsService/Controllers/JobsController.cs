@@ -60,7 +60,7 @@ public sealed class JobsController(CandidateService candidates, MatchService mat
     public ActionResult<ResponseCls<IReadOnlyList<string>>> SuggestedBoards() =>
         Respond(ServiceResult<IReadOnlyList<string>>.Ok(candidates.SuggestedBoards()));
 
-    // ---------- Job search sources (LinkedIn · Naukri · Indeed via JSearch) ----------
+    // ---------- Job search sources (JSearch: LinkedIn · Indeed · Glassdoor; Adzuna) ----------
 
     [HttpGet("sources")]
     public async Task<ActionResult<ResponseCls<IReadOnlyList<SourceStatusDto>>>> Sources(CancellationToken ct) =>

@@ -4,7 +4,7 @@ using Orvanta.Shared.Responses;
 
 namespace Orvanta.JobsService.Services;
 
-/// <summary>Connect / disconnect job search sources such as LinkedIn · Naukri · Indeed (JSearch).</summary>
+/// <summary>Connect / disconnect job search sources: JSearch (LinkedIn · Indeed · Glassdoor) and Adzuna.</summary>
 public sealed class SourceService(IEnumerable<IJobSearchSource> sources, JobSourceCredentials credentials, ILogger<SourceService> logger)
 {
     public async Task<IReadOnlyList<SourceStatusDto>> ListAsync(Guid userId, CancellationToken ct)
@@ -35,8 +35,7 @@ public sealed class SourceService(IEnumerable<IJobSearchSource> sources, JobSour
 
             // Only blame the key when the provider actually rejected it.
             if (ex.Message.Contains("API key", StringComparison.OrdinalIgnoreCase))
-                return ServiceResult<SourceStatusDto>.Fail(400,
-                    "That key was rejected. Copy the x-rapidapi-key value (without quotes) from RapidAPI → JSearch → Playground, and make sure you subscribed to the Basic (free) plan.");
+                return ServiceResult<SourceStatusDto>.Fail(400, source.KeyHelp);
 
             if (ex.Message.Contains("quota", StringComparison.OrdinalIgnoreCase))
                 return ServiceResult<SourceStatusDto>.Fail(400, "This key works but its monthly quota is used up. Try again next month or upgrade the plan.");

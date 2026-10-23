@@ -26,16 +26,22 @@ public sealed class JobSourceCredentials(JobsDbContext db, IOptions<JobsOptions>
             return key;
         }
 
-        return source == "jsearch" && !string.IsNullOrWhiteSpace(_options.JSearch.ApiKey) && _options.JSearch.Enabled
-            ? _options.JSearch.ApiKey
-            : null;
+        return ServerKey(source);
     }
+
+    /// <summary>Workspace-wide credentials from configuration, used when the user hasn't connected their own.</summary>
+    private string? ServerKey(string source) => source switch
+    {
+        "jsearch" when _options.JSearch.IsConfigured => _options.JSearch.ApiKey,
+        "adzuna" => _options.Adzuna.ServerCredential,
+        _ => null
+    };
 
     public async Task<(bool Connected, bool ServerKey, DateTime? ConnectedAtUtc)> StatusAsync(Guid userId, string source, CancellationToken ct)
     {
         var connection = await db.SourceConnections.AsNoTracking()
             .FirstOrDefaultAsync(c => c.UserId == userId && c.Source == source, ct);
-        var serverKey = source == "jsearch" && _options.JSearch.IsConfigured;
+        var serverKey = ServerKey(source) is not null;
         return (connection is not null || serverKey, connection is null && serverKey, connection?.ConnectedAtUtc);
     }
 

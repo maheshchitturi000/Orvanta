@@ -3,7 +3,9 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { Icon, IconName } from '../../../shared/ui/icon/icon';
+import { ThemeSwitcher } from '../../../shared/ui/theme-switcher/theme-switcher';
 import { LayoutService } from '../layout.service';
+import { UserMenu } from '../user-menu/user-menu';
 
 /** Route `data` read by the top navbar. */
 export interface PageMeta {
@@ -16,7 +18,7 @@ export interface PageMeta {
 
 @Component({
   selector: 'app-topbar',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, ThemeSwitcher, UserMenu],
   templateUrl: './topbar.html',
   styleUrl: './topbar.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

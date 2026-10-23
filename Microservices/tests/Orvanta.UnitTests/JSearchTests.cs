@@ -65,6 +65,8 @@ public class JSearchTests
         Assert.Equal("Contoso", job.Company);
         Assert.Equal("Bengaluru, Karnataka, India", job.Location);
         Assert.Equal("https://www.linkedin.com/jobs/view/123", job.ApplyUrl);
+        // "View" opens the real job page, not Google's listing.
+        Assert.Equal("https://www.linkedin.com/jobs/view/123", job.Url);
         Assert.Equal(new DateTime(2026, 10, 15, 9, 0, 0, DateTimeKind.Utc), job.PostedAtUtc);
 
         var request = handler.Last!;

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { SessionTimeout } from '../../auth/session-timeout/session-timeout';
 import { LayoutService } from '../layout.service';
 import { Sidebar } from '../sidebar/sidebar';
 import { Topbar } from '../topbar/topbar';
@@ -10,7 +11,7 @@ import { Topbar } from '../topbar/topbar';
  */
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, Sidebar, Topbar],
+  imports: [RouterOutlet, Sidebar, Topbar, SessionTimeout],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.sidebar-open]': 'layout.sidebarOpen()' },
   template: `
@@ -22,6 +23,7 @@ import { Topbar } from '../topbar/topbar';
         <router-outlet />
       </main>
     </div>
+    <app-session-timeout />
   `,
   styleUrl: './app-shell.scss'
 })

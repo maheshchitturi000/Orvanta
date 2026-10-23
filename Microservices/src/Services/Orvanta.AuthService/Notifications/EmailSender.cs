@@ -44,6 +44,14 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options, ILogger<SmtpE
                 ? $"SMTP status {smtpEx.StatusCode}: {smtpEx.Message}{(smtpEx.InnerException is null ? "" : $" ({smtpEx.InnerException.Message})")}"
                 : ex.Message;
 
+            // Gmail answers a bad login with "535 5.7.8 BadCredentials" and closes the connection; SmtpClient then
+            // reports only "connection was closed", which hides the real cause.
+            if (ex is SmtpException && reason.Contains("connection was closed", StringComparison.OrdinalIgnoreCase))
+            {
+                reason += " Likely cause: the SMTP server rejected the login (Gmail: 535 5.7.8 BadCredentials). " +
+                          "Check Smtp:UserName and Smtp:Password; Gmail app passwords stop working when revoked or after a Google password change.";
+            }
+
             // Common causes: wrong app password (5.7.0 / 5.7.8), FromEmail differs from the login account,
             // port/SSL mismatch, or the network blocking outbound SMTP.
             logger.LogError(ex, "Email to {To} FAILED via {Host}:{Port} as {User}. Reason: {Reason}",

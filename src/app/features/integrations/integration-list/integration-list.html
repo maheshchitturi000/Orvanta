@@ -1,0 +1,56 @@
+<div class="page">
+  <header class="head">
+    <h2>{{ heading() }}</h2>
+    <div class="head-actions">
+      @if (stats().total) {
+        <span class="stat"><strong>{{ stats().connected }}</strong> of {{ stats().total }} connected</span>
+      }
+      <button type="button" class="btn btn-outline btn-sm" (click)="refresh()" [disabled]="store.loading()" title="Refresh">
+        <app-icon name="refresh" [size]="15" /> Refresh
+      </button>
+    </div>
+  </header>
+
+  @if (store.error()) {
+    <div class="alert error" role="alert"><app-icon name="alert" [size]="16" /> {{ store.error() }}</div>
+  }
+
+  @for (section of sections(); track section.key) {
+    <section class="section">
+      @if (category() === 'all') {
+        <h3 class="section-title">{{ section.label }}</h3>
+      }
+
+      <div class="grid">
+        @for (item of section.items; track item.id) {
+          @if (item.state === 'soon') {
+            <article class="card tile soon">
+              <app-integration-logo [entry]="item" [size]="40" />
+              <div class="tile-body">
+                <h4>{{ item.name }}</h4>
+                <span class="badge">Coming soon</span>
+              </div>
+            </article>
+          } @else {
+            <a class="card tile" [routerLink]="['/integrations', item.category, item.id]">
+              <app-integration-logo [entry]="item" [size]="40" />
+              <div class="tile-body">
+                <h4>{{ item.name }}</h4>
+                @if (!store.loaded()) {
+                  <span class="badge muted">Checking…</span>
+                } @else if (item.state === 'connected') {
+                  <span class="badge success">● Connected</span>
+                } @else if (item.state === 'unavailable') {
+                  <span class="badge muted">Unavailable</span>
+                }
+              </div>
+              <span class="cta" [class.primary]="item.state === 'available'">
+                {{ item.state === 'connected' ? 'Manage' : 'Connect' }} <app-icon name="chevronRight" [size]="14" />
+              </span>
+            </a>
+          }
+        }
+      </div>
+    </section>
+  }
+</div>

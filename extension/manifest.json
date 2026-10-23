@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Orvanta AI – Job Apply Assistant",
-  "description": "Fills the job applications you approved in Orvanta. You review and press Submit.",
-  "version": "1.0.0",
+  "description": "Fills the job applications you approved in Orvanta. You press Submit, or turn on auto-submit.",
+  "version": "1.3.0",
   "action": {
     "default_title": "Orvanta",
     "default_popup": "popup.html"
@@ -11,29 +11,49 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["storage", "tabs", "activeTab", "scripting", "alarms"],
+  "permissions": [
+    "storage",
+    "tabs",
+    "activeTab",
+    "scripting",
+    "alarms"
+  ],
   "host_permissions": [
     "http://localhost:5095/*",
+    "http://localhost:4200/*",
     "https://job-boards.greenhouse.io/*",
     "https://boards.greenhouse.io/*",
     "https://jobs.lever.co/*",
     "https://jobs.ashbyhq.com/*",
-    "https://www.linkedin.com/jobs/*",
-    "https://www.naukri.com/*"
+    "https://www.linkedin.com/jobs/*"
   ],
-  "optional_host_permissions": ["https://*/*"],
+  "optional_host_permissions": [
+    "https://*/*"
+  ],
   "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:4200/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_idle"
+    },
     {
       "matches": [
         "https://job-boards.greenhouse.io/*",
         "https://boards.greenhouse.io/*",
         "https://jobs.lever.co/*",
         "https://jobs.ashbyhq.com/*",
-        "https://www.linkedin.com/jobs/*",
-        "https://www.naukri.com/*"
+        "https://www.linkedin.com/jobs/*"
       ],
-      "js": ["content.js"],
-      "css": ["content.css"],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     }
   ],

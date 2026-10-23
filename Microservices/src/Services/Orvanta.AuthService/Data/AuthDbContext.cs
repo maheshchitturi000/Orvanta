@@ -29,6 +29,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.ToTable("EmailOtps");
             e.HasKey(x => x.Id);
             e.Property(x => x.CodeHash).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Purpose).HasMaxLength(30).IsRequired().HasDefaultValue(OtpPurpose.EmailVerification);
             e.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
             e.HasOne(x => x.User).WithMany(u => u.EmailOtps).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });

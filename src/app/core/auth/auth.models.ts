@@ -22,6 +22,13 @@ export interface RegisterRequest {
   acceptTerms: boolean;
 }
 
+export interface ResetPasswordRequest {
+  email: string;
+  code: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
 export interface RegisterResult {
   userId: string;
   email: string;

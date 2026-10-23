@@ -13,7 +13,7 @@ builder.Services.AddOrvantaControllers();
 builder.Services.AddOrvantaJwtAuthentication(builder.Configuration);
 
 builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("AuthDb")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("Orvanta")));
 
 builder.Services.Configure<AuthSecurityOptions>(builder.Configuration.GetSection(AuthSecurityOptions.SectionName));
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
@@ -57,21 +57,14 @@ else
                           "instead of being emailed. Configure Smtp:* in user-secrets to send real emails.");
 }
 
-if (app.Environment.IsDevelopment())
-{
-    // Development convenience. For production, generate EF Core migrations
-    // (dotnet ef migrations add Initial) and apply them in your release pipeline.
-    using var scope = app.Services.CreateScope();
-    var database = scope.ServiceProvider.GetRequiredService<AuthDbContext>().Database;
-    await database.EnsureCreatedAsync();
-    // SQL Express creates databases with AUTO_CLOSE ON, which adds multi-second delays after idle periods.
-    await database.ExecuteSqlRawAsync("ALTER DATABASE CURRENT SET AUTO_CLOSE OFF");
-}
+// Tables, functions and procedures come from Microservices/Database (Deploy-Database.ps1, also run by
+// run-all.ps1). Every service shares the Orvanta database, so no service creates schema on its own.
 
 app.UseForwardedHeaders();
 app.UseOrvantaRequestLogging();
 app.UseOrvantaExceptionHandling();
 app.UseAuthentication();
+app.UseOrvantaAuditing();
 app.UseAuthorization();
 app.MapControllers();
 

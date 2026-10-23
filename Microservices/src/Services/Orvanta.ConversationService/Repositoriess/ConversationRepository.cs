@@ -1,4 +1,4 @@
-﻿
+﻿using System.Data;
 using Dapper;
 using Orvanta.ConversationService.Data;
 using Orvanta.ConversationService.IInterfaces;
@@ -6,6 +6,9 @@ using Orvanta.ConversationService.Models;
 
 namespace Orvanta.ConversationService.Repositories;
 
+/// <summary>
+/// Data access through the stored procedures in Microservices/Database/Orvanta/StoredProcedures.
+/// </summary>
 public sealed class ConversationRepository : IConversationRepository
 {
     private readonly IDbConnectionFactory _connectionFactory;
@@ -19,110 +22,61 @@ public sealed class ConversationRepository : IConversationRepository
         string title,
         CancellationToken cancellationToken)
     {
-        const string sql = """
-            INSERT INTO dbo.Conversations
-                (ConversationId, Title, CreatedAt, UpdatedAt)
-            OUTPUT INSERTED.ConversationId
-            VALUES
-                (@ConversationId, @Title, SYSUTCDATETIME(), SYSUTCDATETIME());
-            """;
-
-        var conversationId = Guid.NewGuid();
-
         using var connection = _connectionFactory.CreateConnection();
 
-        var command = new CommandDefinition(
-            sql,
-            new { ConversationId = conversationId, Title = title },
-            cancellationToken: cancellationToken);
-
-        return await connection.ExecuteScalarAsync<Guid>(command);
+        return await connection.ExecuteScalarAsync<Guid>(Procedure(
+            "dbo.usp_Conversations_Create",
+            new { ConversationId = Guid.NewGuid(), Title = title },
+            cancellationToken));
     }
 
     public async Task<bool> ConversationExistsAsync(
         Guid conversationId,
         CancellationToken cancellationToken)
     {
-        const string sql = """
-            SELECT CAST(
-                CASE WHEN EXISTS (
-                    SELECT 1 FROM dbo.Conversations
-                    WHERE ConversationId = @ConversationId
-                ) THEN 1 ELSE 0 END
-            AS BIT);
-            """;
-
         using var connection = _connectionFactory.CreateConnection();
 
-        var command = new CommandDefinition(
-            sql,
+        return await connection.ExecuteScalarAsync<bool>(Procedure(
+            "dbo.usp_Conversations_Exists",
             new { ConversationId = conversationId },
-            cancellationToken: cancellationToken);
-
-        return await connection.ExecuteScalarAsync<bool>(command);
+            cancellationToken));
     }
 
     public async Task SaveMessageAsync(
         ChatMessage message,
         CancellationToken cancellationToken)
     {
-        const string sql = """
-            INSERT INTO dbo.Messages
-                (ConversationId, Role, Content, CreatedAt)
-            VALUES
-                (@ConversationId, @Role, @Content, SYSUTCDATETIME());
-
-            UPDATE dbo.Conversations
-            SET UpdatedAt = SYSUTCDATETIME()
-            WHERE ConversationId = @ConversationId;
-            """;
-
         using var connection = _connectionFactory.CreateConnection();
 
-        var command = new CommandDefinition(
-            sql,
-            message,
-            cancellationToken: cancellationToken);
-
-        await connection.ExecuteAsync(command);
+        await connection.ExecuteAsync(Procedure(
+            "dbo.usp_Messages_Save",
+            new { message.ConversationId, message.Role, message.Content },
+            cancellationToken));
     }
 
     public async Task<IEnumerable<Conversation>> GetConversationsAsync(
         CancellationToken cancellationToken)
     {
-        const string sql = """
-            SELECT ConversationId, Title, CreatedAt, UpdatedAt
-            FROM dbo.Conversations
-            ORDER BY UpdatedAt DESC;
-            """;
-
         using var connection = _connectionFactory.CreateConnection();
 
-        var command = new CommandDefinition(
-            sql,
-            cancellationToken: cancellationToken);
-
-        return await connection.QueryAsync<Conversation>(command);
+        return await connection.QueryAsync<Conversation>(Procedure(
+            "dbo.usp_Conversations_List",
+            null,
+            cancellationToken));
     }
 
     public async Task<IEnumerable<ChatMessage>> GetMessagesAsync(
         Guid conversationId,
         CancellationToken cancellationToken)
     {
-        const string sql = """
-            SELECT MessageId, ConversationId, Role, Content, CreatedAt
-            FROM dbo.Messages
-            WHERE ConversationId = @ConversationId
-            ORDER BY MessageId ASC;
-            """;
-
         using var connection = _connectionFactory.CreateConnection();
 
-        var command = new CommandDefinition(
-            sql,
+        return await connection.QueryAsync<ChatMessage>(Procedure(
+            "dbo.usp_Messages_ListByConversation",
             new { ConversationId = conversationId },
-            cancellationToken: cancellationToken);
-
-        return await connection.QueryAsync<ChatMessage>(command);
+            cancellationToken));
     }
+
+    private static CommandDefinition Procedure(string name, object? parameters, CancellationToken cancellationToken) =>
+        new(name, parameters, commandType: CommandType.StoredProcedure, cancellationToken: cancellationToken);
 }

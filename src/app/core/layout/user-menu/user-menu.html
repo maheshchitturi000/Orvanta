@@ -1,0 +1,46 @@
+<button type="button" class="trigger" (click)="toggle()" [class.open]="open()"
+        aria-haspopup="dialog" [attr.aria-expanded]="open()" aria-controls="user-panel"
+        [attr.aria-label]="'Account: ' + (user()?.fullName ?? '')">
+  <span class="avatar">{{ initials() }}</span>
+  <span class="trigger-name">{{ user()?.fullName }}</span>
+  <app-icon name="chevronDown" [size]="15" class="chev" />
+</button>
+
+@if (open()) {
+  <div class="panel" id="user-panel" role="dialog" aria-label="Your account">
+    <header class="profile">
+      <span class="avatar lg">{{ initials() }}</span>
+      <div class="who">
+        <strong>{{ user()?.fullName }}</strong>
+        <span class="badge">{{ user()?.role }}</span>
+      </div>
+    </header>
+
+    <dl class="details">
+      <div>
+        <dt><app-icon name="mail" [size]="15" /> <span class="sr-only">Email</span></dt>
+        <dd [title]="user()?.email">{{ user()?.email }}</dd>
+      </div>
+      @if (phone()) {
+        <div>
+          <dt><app-icon name="phone" [size]="15" /> <span class="sr-only">Mobile</span></dt>
+          <dd>{{ phone() }}</dd>
+        </div>
+      }
+    </dl>
+
+    <section class="block">
+      <span class="block-label">Appearance</span>
+      <app-theme-switcher />
+    </section>
+
+    <nav class="links" aria-label="Account shortcuts">
+      <a routerLink="/jobs/profile"><app-icon name="file" [size]="16" /> CV &amp; job preferences <app-icon name="chevronRight" [size]="14" class="go" /></a>
+      <a routerLink="/integrations"><app-icon name="apps" [size]="16" /> Connected apps <app-icon name="chevronRight" [size]="14" class="go" /></a>
+    </nav>
+
+    <button type="button" class="sign-out" (click)="signOut()">
+      <app-icon name="logout" [size]="16" /> Sign out
+    </button>
+  </div>
+}

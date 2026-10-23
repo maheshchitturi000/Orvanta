@@ -1,8 +1,10 @@
 
 using System.Net.Http.Json;
 using System.Text.Json;
+using Orvanta.Shared.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddOrvantaLogging("ai-service");
 
 builder.Services.AddOpenApi();
 
@@ -13,6 +15,9 @@ builder.Services.AddHttpClient("Ollama", client =>
 });
 
 var app = builder.Build();
+
+app.UseOrvantaRequestLogging();
+app.UseOrvantaExceptionHandling();
 
 if (app.Environment.IsDevelopment())
 {

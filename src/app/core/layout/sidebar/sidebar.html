@@ -8,57 +8,131 @@
   </button>
 </div>
 
-<button type="button" class="btn btn-primary btn-block new-chat" (click)="newConversation()">
-  <app-icon name="plus" [size]="16" /> New conversation
-</button>
-
 <nav class="nav" aria-label="Main">
   <span class="section-label">Workspace</span>
   @for (item of nav; track item.link) {
     <a class="nav-item" [routerLink]="item.link" [class.active]="isActive(item)"
-       [attr.aria-current]="isActive(item) ? 'page' : null" (click)="close()">
+       [attr.aria-current]="isActive(item) ? 'page' : null" (click)="onNav(item)">
       <app-icon [name]="item.icon" />
       <span>{{ item.label }}</span>
     </a>
   }
 </nav>
 
-<section class="history" aria-label="Recent conversations">
-  <div class="section-row">
-    <span class="section-label">Recent</span>
-    <button type="button" class="icon-btn" (click)="store.refresh()" [disabled]="store.loading()" aria-label="Refresh conversations">
-      <app-icon name="refresh" [size]="14" />
+<section class="history" [class.collapsed]="!isOpen('recent')" aria-label="Chat history">
+  <div class="history-head">
+    <button type="button" class="history-toggle" (click)="toggle('recent')"
+            [attr.aria-expanded]="isOpen('recent')" aria-controls="history-body">
+      <span class="chev" [class.open]="isOpen('recent')"><app-icon name="chevronRight" [size]="14" /></span>
+      <app-icon name="history" [size]="15" />
+      <span class="section-label">Chat history</span>
+      @if (store.conversations().length) {
+        <span class="count">{{ store.conversations().length }}</span>
+      }
+    </button>
+    <button type="button" class="icon-btn" (click)="store.refresh()" [disabled]="store.loading()"
+            aria-label="Refresh chat history" title="Refresh">
+      <app-icon name="refresh" [size]="14" [class.spinning]="store.loading()" />
     </button>
   </div>
 
-  <div class="history-list">
-    @if (store.loading() && !store.conversations().length) {
-      @for (i of [1, 2, 3]; track i) {
-        <span class="skeleton-line"></span>
+  <div class="collapse" id="history-body" [class.open]="isOpen('recent')">
+    <div class="collapse-inner">
+      @if (showSearch()) {
+        <label class="search">
+          <app-icon name="search" [size]="14" />
+          <span class="sr-only">Search chats</span>
+          <input type="search" placeholder="Search chats" [value]="query()" (input)="query.set($any($event.target).value)" />
+        </label>
       }
-    } @else if (store.error()) {
-      <p class="muted">{{ store.error() }}</p>
-    } @else if (!store.conversations().length) {
-      <p class="muted">Your conversations will appear here.</p>
-    } @else {
-      @for (c of store.conversations(); track c.conversationId) {
-        <button type="button" class="history-item" [class.active]="c.conversationId === store.activeId()"
-                (click)="openConversation(c.conversationId)" [title]="c.title">
-          <app-icon name="message" [size]="15" />
-          <span>{{ c.title }}</span>
-        </button>
-      }
-    }
+
+      <div class="history-list">
+        @if (store.loading() && !store.conversations().length) {
+          @for (i of [1, 2, 3, 4]; track i) {
+            <span class="skeleton-line"></span>
+          }
+        } @else if (store.error()) {
+          <div class="empty">
+            <app-icon name="alert" [size]="16" />
+            <p>{{ store.error() }}</p>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="store.refresh()">Try again</button>
+          </div>
+        } @else if (!store.conversations().length) {
+          <div class="empty">
+            <app-icon name="message" [size]="16" />
+            <p>Your conversations will appear here.</p>
+          </div>
+        } @else if (!groups().length) {
+          <div class="empty"><p>No chats match “{{ query() }}”.</p></div>
+        } @else {
+          @for (group of groups(); track group.key) {
+            <div class="group">
+              <button type="button" class="group-head" (click)="toggle(group.key)"
+                      [attr.aria-expanded]="isOpen(group.key)" [attr.aria-controls]="'group-' + group.key">
+                <span class="chev" [class.open]="isOpen(group.key)"><app-icon name="chevronRight" [size]="12" /></span>
+                <span class="group-label">{{ group.label }}</span>
+                <span class="group-count">{{ group.items.length }}</span>
+              </button>
+
+              <div class="collapse" [id]="'group-' + group.key" [class.open]="isOpen(group.key)">
+                <ul class="collapse-inner items">
+                  @for (c of group.items; track c.conversationId) {
+                    <li>
+                      <button type="button" class="history-item" [class.active]="c.conversationId === store.activeId()"
+                              [attr.aria-current]="c.conversationId === store.activeId() ? 'page' : null"
+                              [tabindex]="isOpen(group.key) ? 0 : -1"
+                              (click)="openConversation(c.conversationId)" [title]="c.title">
+                        <app-icon name="message" [size]="14" />
+                        <span>{{ c.title }}</span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>
   </div>
 </section>
 
-<footer class="account">
-  <span class="avatar">{{ initials() }}</span>
-  <div class="who">
-    <strong>{{ user()?.fullName }}</strong>
-    <small>{{ user()?.email }}</small>
+<footer class="account" [class.open]="accountOpen()">
+  <div class="collapse" id="account-panel" [class.open]="accountOpen()">
+    <div class="collapse-inner">
+      <dl class="account-details">
+        <div>
+          <dt><app-icon name="mail" [size]="14" /><span class="sr-only">Email</span></dt>
+          <dd [title]="user()?.email">{{ user()?.email }}</dd>
+        </div>
+        @if (phone()) {
+          <div>
+            <dt><app-icon name="phone" [size]="14" /><span class="sr-only">Mobile</span></dt>
+            <dd>{{ phone() }}</dd>
+          </div>
+        }
+      </dl>
+
+      <div class="account-theme">
+        <span class="section-label">Appearance</span>
+        <app-theme-switcher [compact]="true" />
+      </div>
+    </div>
   </div>
-  <button type="button" class="icon-btn" (click)="signOut()" aria-label="Sign out" title="Sign out">
-    <app-icon name="logout" />
-  </button>
+
+  <div class="account-row">
+    <button type="button" class="account-toggle" (click)="accountOpen.set(!accountOpen())"
+            [attr.aria-expanded]="accountOpen()" aria-controls="account-panel"
+            [attr.aria-label]="'Account details for ' + (user()?.fullName ?? '')">
+      <span class="avatar">{{ auth.initials() }}</span>
+      <span class="who">
+        <strong>{{ user()?.fullName }}</strong>
+        <small>{{ user()?.email }}</small>
+      </span>
+      <span class="chev" [class.open]="accountOpen()"><app-icon name="chevronDown" [size]="14" /></span>
+    </button>
+    <button type="button" class="icon-btn sign-out" (click)="signOut()" aria-label="Sign out" title="Sign out">
+      <app-icon name="logout" />
+    </button>
+  </div>
 </footer>

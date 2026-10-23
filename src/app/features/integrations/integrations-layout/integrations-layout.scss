@@ -1,0 +1,181 @@
+:host {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---------- Second-level navigation ---------- */
+
+.subnav {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 20px 12px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.tree {
+  display: grid;
+  gap: 6px;
+}
+
+/* Grid items default to min-width: auto, which let long names (LinkedIn · Indeed · Glassdoor) widen the column. */
+.tree > *,
+.branch > *,
+.children > li {
+  min-width: 0;
+}
+
+.branch {
+  display: grid;
+  gap: 2px;
+}
+
+.node {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  .label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &:hover:not(.disabled) {
+    background: var(--lavender-50);
+    color: var(--lavender-800);
+    text-decoration: none;
+  }
+
+  &.active {
+    background: var(--lavender-100);
+    color: var(--lavender-700);
+    font-weight: 600;
+  }
+
+  &.top app-icon {
+    color: var(--text-subtle);
+  }
+
+  &.top.active app-icon {
+    color: var(--lavender-600);
+  }
+}
+
+.count {
+  flex-shrink: 0;
+  min-width: 30px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--neutral-bg);
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+
+  &.on {
+    background: var(--success-bg);
+    color: var(--success);
+  }
+}
+
+.soon {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--lavender-100);
+  color: var(--lavender-700);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.children {
+  display: grid;
+  gap: 1px;
+  margin: 0 0 0 19px;
+  padding: 0 0 0 10px;
+  list-style: none;
+  border-left: 1px solid var(--border);
+}
+
+.node.child {
+  padding: 6px 8px;
+  font-size: 13.5px;
+
+  &.disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--border-strong);
+
+  &[data-state='connected'] {
+    background: var(--success);
+    box-shadow: 0 0 0 3px var(--success-bg);
+  }
+}
+
+.pane {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ---------- Narrow screens: the tree becomes a horizontal tab strip ---------- */
+
+@media (max-width: 860px) {
+  :host {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .subnav {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .children {
+    display: none;
+  }
+
+  .tree {
+    display: flex;
+    gap: 6px;
+  }
+
+  .node.top {
+    white-space: nowrap;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 12px;
+  }
+}

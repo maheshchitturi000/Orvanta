@@ -1,0 +1,108 @@
+<div class="page">
+  <h2 class="greeting">Welcome back, {{ auth.firstName() }}</h2>
+
+  <div class="stats">
+    <a class="card stat" routerLink="/">
+      <span class="stat-icon"><app-icon name="message" [size]="18" /></span>
+      <span class="stat-value">{{ conversations.conversations().length }}</span>
+      <span class="stat-label">Conversations</span>
+    </a>
+    <a class="card stat" routerLink="/integrations">
+      <span class="stat-icon"><app-icon name="apps" [size]="18" /></span>
+      <span class="stat-value">{{ integrations.connectedCount() }}<small>/{{ availableApps() }}</small></span>
+      <span class="stat-label">Connected apps</span>
+    </a>
+    <div class="card stat">
+      <span class="stat-icon"><app-icon name="history" [size]="18" /></span>
+      <span class="stat-value">{{ thisWeek() }}</span>
+      <span class="stat-label">Actions this week</span>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="alert error" role="alert"><app-icon name="alert" [size]="16" /> {{ error() }}</div>
+  }
+
+  <div class="charts">
+    <!-- Actions per day: one series, so the title names it (no legend). -->
+    <section class="card chart" aria-labelledby="per-day-title">
+      <header class="chart-head">
+        <div>
+          <h3 id="per-day-title">Activity</h3>
+          <span class="chart-sub">Last 14 days · {{ total() }} actions</span>
+        </div>
+        <button type="button" class="icon-btn" (click)="load()" [disabled]="loading()" title="Refresh" aria-label="Refresh activity">
+          <app-icon name="refresh" [size]="15" [class.spinning]="loading()" />
+        </button>
+      </header>
+
+      <div class="columns-plot" [class.loading]="loading() && !total()" aria-hidden="true">
+        <div class="y-axis">
+          <span>{{ dayMax() }}</span>
+          <span>{{ dayMax() / 2 }}</span>
+          <span>0</span>
+        </div>
+        <div class="plot">
+          <div class="grid"><span></span><span></span><span></span></div>
+          @for (day of days(); track day.key; let i = $index, last = $last) {
+            <div class="slot" tabindex="0" [class.active]="hovered() === day.key"
+                 (mouseenter)="hovered.set(day.key)" (mouseleave)="hovered.set(null)"
+                 (focus)="hovered.set(day.key)" (blur)="hovered.set(null)">
+              <div class="bar" [style.height]="barHeight(day.total)" [style.transition-delay.ms]="i * 35"></div>
+              <span class="x-label" [class.today]="last">{{ last ? 'Today' : (day.date | date: 'd') }}</span>
+
+              @if (hovered() === day.key) {
+                <div class="tooltip" [class.align-end]="i > 10" [class.align-start]="i < 3" [style.bottom]="tooltipBottom(day.total)">
+                  <strong>{{ day.date | date: 'EEE, d MMM' }}</strong>
+                  <span class="tt-total">{{ day.total }} {{ day.total === 1 ? 'action' : 'actions' }}</span>
+                  @for (area of day.byArea; track area.label) {
+                    <span class="tt-row"><span>{{ area.label }}</span><span>{{ area.total }}</span></span>
+                  }
+                  @if (day.failed) {
+                    <span class="tt-failed"><app-icon name="alert" [size]="12" /> {{ day.failed }} failed</span>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <table class="sr-only">
+        <caption>Actions per day, last 14 days</caption>
+        <thead><tr><th scope="col">Day</th><th scope="col">Actions</th><th scope="col">Failed</th></tr></thead>
+        <tbody>
+          @for (day of days(); track day.key) {
+            <tr><td>{{ day.date | date: 'EEE, d MMM' }}</td><td>{{ day.total }}</td><td>{{ day.failed }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Actions per area: bars are named by their own labels. -->
+    <section class="card chart" aria-labelledby="per-area-title">
+      <header class="chart-head">
+        <div>
+          <h3 id="per-area-title">By area</h3>
+          <span class="chart-sub">Last 14 days</span>
+        </div>
+      </header>
+
+      @if (!areas().length && !loading()) {
+        <p class="empty">No actions yet.</p>
+      } @else {
+        <ul class="bars">
+          @for (area of areas(); track area.area; let i = $index) {
+            <li>
+              <span class="bar-label">{{ area.label }}</span>
+              <span class="bar-track">
+                <span class="bar-fill" [style.width]="barWidth(area.total)" [style.transition-delay.ms]="150 + i * 60"></span>
+              </span>
+              <span class="bar-value">{{ area.total }}</span>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  </div>
+</div>

@@ -3,7 +3,7 @@
     <div class="alert" [class.info]="issue.needsConnection" [class.warning]="!issue.needsConnection">
       <span>{{ issue.message }}</span>
       @if (issue.needsConnection) {
-        <a class="issue-link" routerLink="/integrations">Connect</a>
+        <a class="issue-link" [routerLink]="['/integrations/food', issue.provider]">Connect</a>
       }
     </div>
   }

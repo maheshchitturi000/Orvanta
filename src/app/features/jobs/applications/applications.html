@@ -1,3 +1,16 @@
+@if (readyCount()) {
+  <div class="apply-bar">
+    <span><strong>{{ readyCount() }}</strong> ready to submit</span>
+    <button type="button" class="btn btn-primary btn-sm" (click)="launching.set(true)">
+      <app-icon name="send" [size]="15" /> Apply now
+    </button>
+  </div>
+}
+
+@if (launching()) {
+  <app-apply-launcher [ready]="readyCount()" (closed)="launching.set(false); load(true)" />
+}
+
 <div class="filters" role="tablist" aria-label="Filter applications">
   @for (f of filters; track f.key) {
     <button type="button" class="filter" role="tab" [class.active]="filter() === f.key" [attr.aria-selected]="filter() === f.key"

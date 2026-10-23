@@ -1,0 +1,49 @@
+<aside class="subnav" aria-label="Integrations">
+  <nav class="tree">
+    <a class="node top" routerLink="/integrations/all" routerLinkActive="active" ariaCurrentWhenActive="page">
+      <app-icon name="apps" [size]="16" />
+      <span class="label">All integrations</span>
+      <span class="count">{{ store.items().length }}</span>
+    </a>
+
+    @for (category of categories(); track category.key) {
+      <div class="branch">
+        <a class="node top" [routerLink]="categoryLink(category.key)" routerLinkActive="active"
+           [routerLinkActiveOptions]="{ exact: true }" ariaCurrentWhenActive="page">
+          <app-icon [name]="category.icon" [size]="16" />
+          <span class="label">{{ category.label }}</span>
+          @if (category.key === 'travel') {
+            <span class="soon">Soon</span>
+          } @else {
+            <span class="count" [class.on]="category.connected > 0">{{ category.connected }}/{{ category.items.length }}</span>
+          }
+        </a>
+
+        <ul class="children">
+          @for (item of category.items; track item.id) {
+            <li>
+              @if (item.state === 'soon') {
+                <span class="node child disabled" aria-disabled="true">
+                  <app-integration-logo [entry]="item" [size]="20" />
+                  <span class="label">{{ item.name }}</span>
+                </span>
+              } @else {
+                <a class="node child" [routerLink]="['/integrations', item.category, item.id]" routerLinkActive="active"
+                   ariaCurrentWhenActive="page">
+                  <app-integration-logo [entry]="item" [size]="20" />
+                  <span class="label" [title]="item.name">{{ item.name }}</span>
+                  <span class="dot" [attr.data-state]="item.state"
+                        [title]="item.state === 'connected' ? 'Connected' : 'Not connected'"></span>
+                </a>
+              }
+            </li>
+          }
+        </ul>
+      </div>
+    }
+  </nav>
+</aside>
+
+<section class="pane">
+  <router-outlet />
+</section>

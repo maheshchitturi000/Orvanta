@@ -12,6 +12,7 @@ const SOURCE_LABELS: Record<string, string> = {
   naukri: 'Naukri',
   indeed: 'Indeed',
   glassdoor: 'Glassdoor',
+  adzuna: 'Adzuna',
   foundit: 'Foundit',
   apnajobs: 'Apna',
   jobrapido: 'Jobrapido',
@@ -46,8 +47,10 @@ export class Matches implements OnInit {
   protected readonly notice = signal('');
   /** Outcome of the last "Search now": hints and closest jobs when matches are few. */
   protected readonly lastSearch = signal<DiscoveryResult | null>(null);
-  /** null = unknown yet; false shows the "Connect LinkedIn · Naukri · Indeed" banner. */
+  /** null = unknown yet; false shows the "Connect job sites" banner. */
   protected readonly jobSitesConnected = signal<boolean | null>(null);
+  /** A Naukri search for the user's main role. Naukri offers no API, so its jobs are only linked to, never read. */
+  protected readonly naukriUrl = signal<string | null>(null);
 
   protected readonly allSelected = computed(() => this.matches().length > 0 && this.selected().size === this.matches().length);
   protected readonly needsCv = computed(() => this.state.summary()?.hasCv === false);
@@ -57,6 +60,20 @@ export class Matches implements OnInit {
     this.api.sources()
       .then(r => this.jobSitesConnected.set((r.statusObject ?? []).some(s => s.connected)))
       .catch(() => this.jobSitesConnected.set(null));
+    void this.loadNaukriLink();
+  }
+
+  private async loadNaukriLink(): Promise<void> {
+    try {
+      const [profile, preferences] = await Promise.all([this.api.profile(), this.api.preferences()]);
+      const role = preferences.statusObject?.desiredTitles[0] || profile.statusObject?.currentTitle || '';
+      if (!role.trim()) return;
+      const slug = role.toLowerCase().replace(/\./g, 'dot ').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const years = Math.floor(profile.statusObject?.totalYearsExperience ?? 0);
+      this.naukriUrl.set(`https://www.naukri.com/${slug}-jobs?k=${encodeURIComponent(role.trim())}&experience=${years}`);
+    } catch {
+      // Optional shortcut; the page works without it.
+    }
   }
 
   async load(): Promise<void> {

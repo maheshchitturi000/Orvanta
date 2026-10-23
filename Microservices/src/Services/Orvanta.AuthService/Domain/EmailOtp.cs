@@ -1,6 +1,6 @@
 namespace Orvanta.AuthService.Domain;
 
-/// <summary>One-time password sent by email to confirm a registration.</summary>
+/// <summary>One-time password sent by email: confirms a registration or authorizes a password reset.</summary>
 public sealed class EmailOtp
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -10,10 +10,19 @@ public sealed class EmailOtp
     /// <summary>HMAC-SHA256 of the code. The plain code is only ever sent by email.</summary>
     public string CodeHash { get; set; } = string.Empty;
 
+    /// <summary>What the code may be used for (<see cref="OtpPurpose"/>). A code never works for another purpose.</summary>
+    public string Purpose { get; set; } = OtpPurpose.EmailVerification;
+
     public DateTime ExpiresAtUtc { get; set; }
     public int FailedAttempts { get; set; }
     public DateTime? ConsumedAtUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public bool IsActive(DateTime nowUtc) => ConsumedAtUtc is null && ExpiresAtUtc > nowUtc;
+}
+
+public static class OtpPurpose
+{
+    public const string EmailVerification = "EmailVerification";
+    public const string PasswordReset = "PasswordReset";
 }

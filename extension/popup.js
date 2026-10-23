@@ -8,6 +8,12 @@ function render(html) {
   content.innerHTML = html;
 }
 
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text ?? '';
+  return div.innerHTML;
+}
+
 async function refresh() {
   const status = await send('status');
 
@@ -20,12 +26,38 @@ async function refresh() {
     return;
   }
 
+  if (status.running && status.blockedHost) {
+    // The run's tab is on a site Orvanta may not access yet. Permission prompts must come from a click here.
+    render(`
+      <div class="card">
+        <p class="error">Orvanta isn't allowed on <b>${status.blockedHost}</b>, so it can't fill this job.</p>
+        <small>Allow Orvanta on job sites (company careers pages) to continue.</small>
+      </div>
+      <button id="allow" class="primary">Allow &amp; continue</button>
+      <button id="stop">Stop</button>`);
+    document.getElementById('allow').onclick = async () => {
+      try {
+        await chrome.permissions.request({ origins: ['https://*/*'] });
+      } catch {
+        /* declined */
+      }
+      await send('retry-blocked');
+      window.close();
+    };
+    document.getElementById('stop').onclick = async () => { await send('stop'); refresh(); };
+    return;
+  }
+
   if (status.running) {
+    const attention = status.attention
+      ? `<div class="card attention"><b>Action required</b><br><small>${escapeHtml(status.attention)}</small></div>`
+      : '';
     render(`
       <div class="card">
         <div class="big">${status.position} / ${status.total}</div>
-        <small>Applying… review each form and press the site's Submit button.</small>
+        <small>${status.auto?.autoSubmit ? 'Auto-applying…' : 'Applying… review each form and press the site\'s Submit button.'}</small>
       </div>
+      ${attention}
       <button id="stop">Stop</button>`);
     document.getElementById('stop').onclick = async () => { await send('stop'); refresh(); };
     return;
@@ -49,7 +81,7 @@ async function refresh() {
   document.getElementById('settings').onclick = () => chrome.runtime.openOptionsPage();
 
   document.getElementById('start').onclick = async () => {
-    // Jobs found via LinkedIn/Naukri/Indeed can open on any company site. Ask once (must be in this
+    // Jobs found via LinkedIn/Indeed/Glassdoor can open on any company site. Ask once (must be in this
     // click handler) so the extension may fill forms there; if declined, known sites still work.
     try {
       await chrome.permissions.request({ origins: ['https://*/*'] });

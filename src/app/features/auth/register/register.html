@@ -49,20 +49,7 @@
         </button>
       </div>
 
-      <div class="strength" [attr.data-score]="strength()">
-        <div class="strength-bars">
-          <span></span><span></span><span></span><span></span>
-        </div>
-        <span class="strength-label">{{ strengthLabel() }}</span>
-      </div>
-
-      <ul class="rules">
-        @for (rule of passwordRules(); track rule.label) {
-          <li [class.ok]="rule.ok">
-            <span class="rule-icon" aria-hidden="true">{{ rule.ok ? '✓' : '•' }}</span>{{ rule.label }}
-          </li>
-        }
-      </ul>
+      <app-password-strength [value]="passwordValue()" />
 
       @if (showError('password') && form.controls.password.errors?.['server']) {
         <span class="error-text">{{ errorFor('password') }}</span>

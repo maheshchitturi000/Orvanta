@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/Database/">
+    <Project Path="Database/Orvanta.Database.csproj" />
+  </Folder>
   <Folder Name="/src/" />
   <Folder Name="/src/BuildingBlocks/">
     <Project Path="src/BuildingBlocks/Orvanta.Shared/Orvanta.Shared.csproj" />

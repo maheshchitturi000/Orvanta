@@ -15,15 +15,18 @@ public interface IJobSearchSource
     /// <summary>Connection key, e.g. "jsearch".</summary>
     string Name { get; }
 
-    /// <summary>What users see, e.g. "LinkedIn · Naukri · Indeed".</summary>
+    /// <summary>What users see, e.g. "LinkedIn · Indeed · Glassdoor".</summary>
     string DisplayName { get; }
+
+    /// <summary>Shown when the provider rejects the user's key: where to find the right one.</summary>
+    string KeyHelp { get; }
 
     Task<IReadOnlyList<SourcedJob>> SearchAsync(JobSearchQuery query, string apiKey, CancellationToken ct);
 }
 
 /// <summary>
 /// JSearch via RapidAPI (GET /search). Each job's <see cref="SourcedJob.Source"/> is the site that
-/// published it ("linkedin", "naukri", "indeed"...), so the UI can say "via LinkedIn".
+/// published it ("linkedin", "indeed", "glassdoor"...), so the UI can say "via LinkedIn".
 /// </summary>
 public sealed partial class JSearchSource(IHttpClientFactory factory, IOptions<JobsOptions> options, ILogger<JSearchSource> logger) : IJobSearchSource
 {
@@ -31,7 +34,10 @@ public sealed partial class JSearchSource(IHttpClientFactory factory, IOptions<J
 
     public string Name => "jsearch";
 
-    public string DisplayName => "LinkedIn · Naukri · Indeed";
+    public string DisplayName => "LinkedIn · Indeed · Glassdoor";
+
+    public string KeyHelp =>
+        "That key was rejected. Copy the x-rapidapi-key value (without quotes) from RapidAPI → JSearch → Playground, and make sure you subscribed to the Basic (free) plan.";
 
     public async Task<IReadOnlyList<SourcedJob>> SearchAsync(JobSearchQuery query, string apiKey, CancellationToken ct)
     {
@@ -113,13 +119,14 @@ public sealed partial class JSearchSource(IHttpClientFactory factory, IOptions<J
             title,
             location,
             j.TryGetProperty("job_is_remote", out var remote) && remote.ValueKind == JsonValueKind.True,
-            Str(j, "job_google_link") is { Length: > 0 } google ? google : applyUrl,
+            // "View" opens the real job page (company site, LinkedIn, Indeed...); Google's listing only as a fallback.
+            applyUrl.Length > 0 ? applyUrl : Str(j, "job_google_link"),
             applyUrl,
             Html.Truncate(Html.ToText(Str(j, "job_description"))),
             posted);
     }
 
-    /// <summary>"LinkedIn" → "linkedin", "Naukri.com" → "naukri"; falls back to the apply link's host.</summary>
+    /// <summary>"LinkedIn" → "linkedin", "Foundit.in" → "foundit"; falls back to the apply link's host.</summary>
     public static string Publisher(string publisher, string applyUrl)
     {
         // "Jobs | Siemens Healthineers", "Careers at Contoso": the employer's own careers site.
@@ -175,6 +182,17 @@ public static class CountryCodes
         ["munich"] = "de", ["amsterdam"] = "nl", ["dublin"] = "ie", ["toronto"] = "ca", ["vancouver"] = "ca", ["sydney"] = "au",
         ["melbourne"] = "au", ["new york"] = "us", ["san francisco"] = "us", ["seattle"] = "us", ["austin"] = "us", ["paris"] = "fr"
     };
+
+    /// <summary>Places that name a whole country ("India", "UK"), as opposed to a city.</summary>
+    private static readonly HashSet<string> CountryNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "india", "united states", "usa", "us", "united kingdom", "uk", "england", "canada", "australia", "germany", "france",
+        "netherlands", "ireland", "singapore", "united arab emirates", "uae", "saudi arabia", "qatar", "japan", "spain", "italy",
+        "poland", "sweden", "switzerland", "new zealand", "malaysia", "portugal", "belgium", "denmark", "norway", "finland",
+        "austria", "brazil", "mexico", "south africa"
+    };
+
+    public static bool IsCountry(string place) => CountryNames.Contains(place.Trim());
 
     /// <summary>"Bengaluru, India" → "in"; unknown places → null (search text still carries the place).</summary>
     public static string? Resolve(string place)

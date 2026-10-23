@@ -4,12 +4,19 @@ Backend for Orvanta AI (.NET 10). The Angular app in the repo root talks **only*
 
 ```
 Angular (4200) ──► Gateway :5095 (YARP, CORS, rate limits)
-                     ├─ /api/auth/*          ──► AuthService          :5101  (SQL: OrvantaAuth)
-                     ├─ /api/integrations/*  ──► FoodService          :5077  (SQL: OrvantaFood)
+                     ├─ /api/auth/*          ──► AuthService          :5101  (SQL: Orvanta)
+                     ├─ /api/integrations/*  ──► FoodService          :5077  (SQL: Orvanta)
                      ├─ /api/food/*          ──► FoodService          :5077 ──► Swiggy MCP / Zomato MCP
                      ├─ /api/chat            ──► AIService            :5212 ──► Ollama (qwen3:4b)
-                     └─ /api/conversations/* ──► ConversationService  :5005  (SQL: OrvantaDb)
+                     └─ /api/conversations/* ──► ConversationService  :5005  (SQL: Orvanta)
 ```
+
+## Database
+
+All services share **one SQL Server database, `Orvanta`**, with plain table names (`Users`, `AppLogs`,
+`Conversations`...). Every service uses the connection string `ConnectionStrings:Orvanta`. Tables, functions and stored
+procedures live in `Database/Orvanta` and are created by `Database/Deploy-Database.ps1` (run by `run-all.ps1`); services
+never create schema themselves. See `Database/README.md`.
 
 ## Folder layout
 
@@ -18,8 +25,9 @@ Microservices/
 ├─ Orvanta.slnx
 ├─ run-all.ps1                         # starts all services locally
 ├─ setup-secrets.ps1                   # one-time: creates local dev keys in user-secrets
+├─ Database/                           # the single Orvanta database: Tables/, Functions/, StoredProcedures/ + Deploy-Database.ps1
 ├─ src/
-│  ├─ BuildingBlocks/Orvanta.Shared    # ResponseCls, JWT validation, AES-GCM, exception middleware
+│  ├─ BuildingBlocks/Orvanta.Shared    # ResponseCls, JWT validation, AES-GCM, exception middleware, DB app/audit logging
 │  ├─ Gateway/Orvanta.Gateway          # YARP reverse proxy (replaces the old gateway)
 │  └─ Services/
 │     ├─ Orvanta.AuthService           # register → email OTP → login, JWT, refresh tokens
@@ -38,7 +46,7 @@ FoodService; every other call goes through the Gateway.
 ## Jobs: CV-matched auto-apply
 
 ```
-Angular  ──► Gateway /api/jobs/* ──► JobsService :5081 ──► SQL (OrvantaJobs)
+Angular  ──► Gateway /api/jobs/* ──► JobsService :5081 ──► SQL (Orvanta)
                                          │  approve / run discovery
                                          ▼
                               Azure Storage Queues (Azurite locally)
@@ -63,15 +71,24 @@ synonyms), and 15% seniority (required years vs CV). Guards: a different job fun
 solutions…) or a core skill in the title missing from the CV keeps a job below 80.
 
 **Job sources.**
-- *Company career boards* (Greenhouse, Lever, Ashby): free public APIs, scanned in full per board.
+- *Company career boards* (Greenhouse, Lever, Ashby): free public APIs, scanned in full per board. The
+  defaults (`Jobs:DefaultBoards`) are companies with open software roles in India (Okta, Databricks,
+  Zscaler, MongoDB, GitLab, Meesho, Zeta, Sarvam…), checked against their live boards.
 - *JSearch* (Google for Jobs via RapidAPI): searches built from **target roles × locations** return
-  listings published on **LinkedIn, Naukri, Indeed, Glassdoor** and company sites, in any country
+  listings published on **LinkedIn, Indeed, Glassdoor, Foundit** and company sites, in any country
   (locations are mapped to ISO country codes). Each match shows "via LinkedIn" and so on. Free plans have
   a monthly request quota, so each run makes at most `Jobs:JSearch:MaxQueriesPerRun` searches (default 3)
   and caches results for 6 hours. Duplicates across sources are removed.
   Setup: subscribe to JSearch on RapidAPI, then
   `dotnet user-secrets set "Jobs:JSearch:ApiKey" "<key>" --project src/Services/Jobs/Orvanta.JobsService`.
   The Functions project shares the same user-secrets store.
+- *Adzuna* (official API, developer.adzuna.com): jobs Adzuna aggregates from job boards and company sites
+  in 19 countries, India included. Same role × location searches; a city in the location narrows the
+  search (`where`), a bare country searches the whole market. Users connect their own Application ID and
+  Key on the Integrations page, or set workspace ones with
+  `dotnet user-secrets set "Jobs:Adzuna:AppId" "<id>"` and `"Jobs:Adzuna:AppKey" "<key>"`.
+- *Naukri* is not a source: it offers no API for other apps, and its terms forbid scraping. The Matches
+  page only links to a Naukri search for the user's role.
 
 **AI is optional.** With Ollama running (`Jobs:Llm`), CVs are parsed and cover letters written by the
 local model. Without it, rule-based parsing and a template letter are used, so nothing breaks.
@@ -106,12 +123,14 @@ Services return `ServiceResult<T>` from business logic; `ApiControllerBase.Respo
 | Password storage | PBKDF2-HMAC-SHA256, 600k iterations, 16-byte random salt per user + server-side pepper; constant-time compare; automatic rehash when the policy is raised |
 | Password policy | 8–128 chars, upper + lower + digit + symbol (validated on the client and the server) |
 | Email verification | 6-digit OTP, HMAC-hashed at rest, 10-min expiry, max 5 attempts, 60 s resend cooldown, single active code |
+| Password reset | Forgot password → 6-digit OTP by email (purpose-bound: a reset code can never verify an email or vice versa) → new password. Same response for unknown emails, same OTP limits as above, code used up only when the new password is saved, all sessions revoked and a "password changed" email sent afterwards |
 | Brute force | Account lockout (5 failures → 15 min) + Gateway rate limit (10/min/IP on login, register, OTP) |
-| Access token | JWT **signed** (HS256) **and encrypted** (JWE: A256KW + A256CBC-HS512), 15-min lifetime, kept in memory in the browser |
-| Refresh token | 64 random bytes, SHA-256 hashed in DB, HttpOnly + Secure + SameSite=Strict cookie scoped to `/api/auth`, rotated on every use; reuse of an old token revokes the whole session family |
+| Access token | JWT **signed** (HS256) **and encrypted** (JWE: A256KW + A256CBC-HS512), 15-min lifetime, kept in memory in the browser. The web app asks "Stay signed in?" 2 minutes before it expires; no answer signs the user out |
+| Refresh token | 64 random bytes, SHA-256 hashed in DB, HttpOnly + Secure + SameSite=Strict cookie scoped to `/api/auth`, **30-min lifetime** (`Jwt:RefreshTokenMinutes`), rotated on every use so it acts as an idle timeout; reuse of an old token revokes the whole session family |
 | Provider tokens | Swiggy/Zomato OAuth tokens encrypted at rest with AES-256-GCM |
 | Provider OAuth | OAuth 2.1 + PKCE (S256), one-time `state` stored hashed, RFC 8414 discovery, RFC 7591 dynamic client registration |
 | Account enumeration | Generic messages for unknown emails on login and resend; constant-time dummy hash |
+| Logging & audit | Warning/Error logs (incl. every unhandled exception, with the trace id shown to the user) in `OrvantaLogs.dbo.AppLogs`; every signed-in change and every auth event in `OrvantaLogs.dbo.AuditLogs`. See `Database/README.md` |
 | Authorization | `[Authorize(Policy = "UserOnly")]` on every food and integration endpoint; role claim supports `Admin` |
 
 ### Secrets
@@ -164,6 +183,45 @@ With SMTP not configured, find the OTP in the **AuthService** window (`[DEV EMAI
 Implement `IFoodProvider` (or a new `ITravelProvider` contract), register it in `FoodService/Program.cs`,
 and add an entry under `FoodProviders:Providers` in `appsettings.json`. OAuth, token refresh, encrypted
 storage and the MCP transport are shared.
+
+## ONDC (open network)
+
+Orvanta joins [ONDC](https://ondc.org) as a **buyer app** (BAP) in the food domain (`ONDC:RET11`). Unlike
+Swiggy/Zomato there is no per-user connection: search reaches every seller app on the network.
+
+**Code**: `FoodService/Ondc/` (protocol, crypto, network) with `Controllers/OndcController.cs` (the app's
+API), `OndcNetworkController.cs` (what ONDC calls) and `OndcSandboxController.cs` (local test network).
+**Data**: tables `OndcSearches`, `OndcCatalogItems`, `OndcOrders`, `OndcMessages` and the `usp_Ondc*`
+procedures, accessed through `OndcRepository` (Dapper). Every message in and out is stored in `OndcMessages`.
+
+| Step | App API (`/api/ondc`, signed-in user) | ONDC messages |
+|---|---|---|
+| Search | `POST searches { query, city }` | `search` → gateway, `on_search` from each seller |
+| Price | `POST orders { catalogItemId, quantity }` | `select` / `on_select` (item, delivery, packing, tax) |
+| Place (cash on delivery) | `POST orders/{id}/place { name, phone, addressLine, city, areaCode }` | `init` / `on_init`, then `confirm` / `on_confirm` |
+| Status | `POST orders/{id}/refresh` | `status` / `on_status` |
+
+Also `GET status`, `GET searches/{transactionId}`, `GET orders`, `GET orders/{id}`.
+
+Requests are signed (`Authorization: Signature …`, BLAKE2b-512 digest + Ed25519). Callbacks on
+`/ondc/on_*` are accepted **only** with a valid signature from a key in the ONDC registry; anything else
+gets `NACK` 401.
+
+**Modes** (`Ondc:Mode`): `Sandbox` (default) runs a local gateway, seller (three sample restaurants) and
+registry under `/ondc-sandbox/*` in FoodService, with nothing to register. It speaks the real protocol,
+so the whole flow can be tested offline. The gateway does not route `/ondc-sandbox`, and it answers 404
+in any other mode.
+
+**Going live** (`Staging` → `PreProduction` → `Production`):
+1. Generate keys: `GET http://localhost:5077/ondc-sandbox/keys` (sandbox mode) and keep the output in
+   user-secrets (`Ondc:SigningPrivateKey`, `Ondc:EncryptionPrivateKey`), never in appsettings.
+2. Register at the ONDC portal with your subscriber id (public domain), the public keys and the callback URL
+   `https://<domain>/ondc` (the gateway routes `/ondc/*` and `/ondc-site-verification.html` to FoodService).
+3. Set `Ondc:SubscriberId`, `SubscriberUrl`, `UniqueKeyId`, `SiteVerificationRequestId`,
+   `OndcEncryptionPublicKey`, `GatewayUrl`, `RegistryUrl` for that environment. The ONDC page's
+   "Before going live" list shows what is still missing; the service refuses to start without them.
+4. ONDC calls `/ondc/on_subscribe` (challenge answered with the encryption key) and reads
+   `/ondc-site-verification.html` (signed request id).
 
 ## Provider notes (please read)
 

@@ -45,7 +45,7 @@
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--white);
+  background: var(--surface);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
   &:hover {
@@ -157,13 +157,13 @@
   color: var(--lavender-700);
 
   &[data-provider='swiggy'] {
-    background: #fff1e8;
-    color: #d45a00;
+    background: color-mix(in srgb, #fc8019 14%, transparent);
+    color: color-mix(in srgb, #d45a00 75%, var(--text));
   }
 
   &[data-provider='zomato'] {
-    background: #ffeef0;
-    color: #c81e3a;
+    background: color-mix(in srgb, #cb202d 14%, transparent);
+    color: color-mix(in srgb, #c81e3a 75%, var(--text));
   }
 }
 
@@ -184,7 +184,7 @@
   padding: 18px;
   border: 1px solid var(--lavender-200);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, var(--lavender-25), var(--white));
+  background: linear-gradient(180deg, var(--lavender-25), var(--surface));
 
   h3 {
     font-size: 17px;

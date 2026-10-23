@@ -96,7 +96,7 @@
   &.great {
     border-color: var(--success);
     background: var(--success-bg);
-    color: #0c6b37;
+    color: var(--success-text);
   }
 
   &.good {
@@ -143,24 +143,24 @@
   .via {
     padding: 1px 8px;
     border-radius: 999px;
-    background: #f3f2f7;
+    background: var(--neutral-bg);
     font-size: 11.5px;
     font-weight: 600;
     color: var(--text-muted);
 
     &[data-source='linkedin'] {
-      background: #e8f1fb;
-      color: #0a66c2;
+      background: color-mix(in srgb, #0a66c2 14%, transparent);
+      color: color-mix(in srgb, #0a66c2 70%, var(--text));
     }
 
     &[data-source='naukri'] {
-      background: #eef3ff;
-      color: #275df5;
+      background: color-mix(in srgb, #275df5 14%, transparent);
+      color: color-mix(in srgb, #275df5 70%, var(--text));
     }
 
     &[data-source='indeed'] {
-      background: #edf1ff;
-      color: #2557a7;
+      background: color-mix(in srgb, #2557a7 14%, transparent);
+      color: color-mix(in srgb, #2557a7 70%, var(--text));
     }
   }
 }
@@ -187,10 +187,10 @@
   }
 
   &.missing {
-    background: #f3f2f7;
+    background: var(--neutral-bg);
     color: var(--text-subtle);
     text-decoration: line-through;
-    text-decoration-color: rgba(0, 0, 0, 0.2);
+    text-decoration-color: var(--border-strong);
   }
 }
 
@@ -270,9 +270,9 @@
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
-  border: 1px solid #cfe1f5;
+  border: 1px solid color-mix(in srgb, #0a66c2 25%, var(--border));
   border-radius: var(--radius);
-  background: linear-gradient(90deg, #f3f8fe, var(--white));
+  background: linear-gradient(90deg, color-mix(in srgb, #0a66c2 6%, var(--surface)), var(--surface));
 
   > div:nth-child(2) {
     flex: 1;
@@ -302,8 +302,8 @@
       width: 32px;
       height: 32px;
       border-radius: 9px;
-      border: 2px solid var(--white);
-      color: var(--white);
+      border: 2px solid var(--surface);
+      color: var(--on-accent);
       font-weight: 800;
       font-size: 14px;
 
@@ -313,8 +313,8 @@
     }
 
     .li { background: #0a66c2; }
-    .nk { background: #275df5; }
     .id { background: #2557a7; }
+    .gd { background: #0caa41; }
   }
 }
 
@@ -360,13 +360,13 @@
   gap: 12px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--border);
   font-size: 13.5px;
 }
 
 .near {
-  background: var(--white);
+  background: var(--surface);
   border-color: var(--border);
 
   li {
@@ -388,7 +388,7 @@
   display: grid;
   place-items: center;
   border-radius: 999px;
-  background: #f3f2f7;
+  background: var(--neutral-bg);
   color: var(--text-muted);
   font-size: 12.5px;
   font-weight: 700;

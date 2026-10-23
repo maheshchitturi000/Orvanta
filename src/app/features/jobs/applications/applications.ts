@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { ApiError } from '../../../core/models/response-cls.model';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { ApplyLauncher } from '../apply-launcher/apply-launcher';
 import { JobsState } from '../jobs-state.service';
 import { ApplicationStatus, JobApplication } from '../jobs.models';
 import { JobsService } from '../jobs.service';
@@ -18,7 +19,7 @@ const STATUS_LABEL: Record<ApplicationStatus, string> = {
 
 @Component({
   selector: 'app-job-applications',
-  imports: [DatePipe, Icon],
+  imports: [DatePipe, Icon, ApplyLauncher],
   templateUrl: './applications.html',
   styleUrl: './applications.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -49,6 +50,9 @@ export class Applications implements OnInit {
       f === 'all' ? true : f === 'active' ? a.status === 'Queued' || a.status === 'Preparing' : a.status === f
     );
   });
+
+  protected readonly readyCount = computed(() => this.items().filter(a => a.status === 'ReadyToSubmit').length);
+  protected readonly launching = signal(false);
 
   private readonly hasActive = computed(() => this.items().some(a => a.status === 'Queued' || a.status === 'Preparing'));
 

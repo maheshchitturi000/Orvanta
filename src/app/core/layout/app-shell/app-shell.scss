@@ -2,7 +2,7 @@
   display: grid;
   grid-template-columns: 272px minmax(0, 1fr);
   height: 100dvh;
-  background: var(--white);
+  background: var(--surface);
 }
 
 .sidebar {
@@ -27,7 +27,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, var(--white) 0%, var(--lavender-25) 100%);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--lavender-25) 100%);
 }
 
 @media (max-width: 960px) {
@@ -55,7 +55,7 @@
       position: fixed;
       inset: 0;
       z-index: 20;
-      background: rgba(42, 27, 102, 0.28);
+      background: var(--overlay);
     }
   }
 }

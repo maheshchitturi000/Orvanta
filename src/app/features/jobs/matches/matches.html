@@ -8,12 +8,12 @@
 } @else {
   @if (jobSitesConnected() === false) {
     <div class="connect-banner">
-      <div class="logos" aria-hidden="true"><span class="li">in</span><span class="nk">N</span><span class="id">i</span></div>
+      <div class="logos" aria-hidden="true"><span class="li">in</span><span class="id">i</span><span class="gd">G</span></div>
       <div>
-        <strong>Connect LinkedIn · Naukri · Indeed</strong>
-        <small>Right now only a few company career sites are searched. Connect once to find jobs that match your skills on the big job sites.</small>
+        <strong>Connect job sites</strong>
+        <small>Right now only company career sites are searched. Connect LinkedIn · Indeed · Glassdoor or Adzuna to find more jobs that match your CV.</small>
       </div>
-      <a class="btn btn-primary btn-sm" routerLink="/integrations" fragment="job-search">Connect</a>
+      <a class="btn btn-primary btn-sm" routerLink="/integrations/jobs">Connect</a>
     </div>
   }
 
@@ -24,6 +24,12 @@
     </label>
 
     <div class="actions">
+      @if (naukriUrl(); as url) {
+        <a class="btn btn-outline btn-sm" [href]="url" target="_blank" rel="noopener"
+           title="Naukri has no API for other apps, so its jobs can't be listed here. This opens a Naukri search for your role.">
+          Search on Naukri <app-icon name="external" [size]="13" />
+        </a>
+      }
       <button type="button" class="btn btn-outline btn-sm" (click)="searchNow()" [disabled]="searching() || busy()">
         @if (searching()) { <span class="spinner"></span> Searching… } @else { <app-icon name="refresh" [size]="15" /> Search now }
       </button>

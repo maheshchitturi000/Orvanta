@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Orvanta.Jobs.Core;
 using Orvanta.Jobs.Core.Data;
 using Orvanta.Jobs.Core.Domain;
+using Orvanta.Jobs.Core.Sources;
 using Orvanta.Jobs.Core.Workflow;
 using Orvanta.JobsService.Contracts;
 using Orvanta.Shared.Responses;
@@ -156,7 +157,7 @@ public sealed class MatchService(
         if (outcome.NewMatches >= 5) return hints;
 
         if (!outcome.SearchConnected)
-            hints.Add(new("Connect LinkedIn · Naukri · Indeed to search those job sites too. Right now only a few company career sites are scanned.", "/integrations"));
+            hints.Add(new("Connect a job site source (LinkedIn · Indeed · Glassdoor, or Adzuna) to search beyond company career sites.", "/integrations/jobs"));
 
         if (preference.DesiredTitles.Count == 0 && outcome.RolesUsed.Count > 0)
             hints.Add(new($"Searched roles from your CV: {string.Join(", ", outcome.RolesUsed)}. Set your own target roles to change this.", "profile"));
@@ -166,6 +167,10 @@ public sealed class MatchService(
         var closest = outcome.NearMisses.Where(n => !n.Match.Capped).Select(n => n.Match.Score).DefaultIfEmpty(0).Max();
         if (closest >= 70 && preference.MinMatchScore > closest)
             hints.Add(new($"Your closest jobs scored {closest}%. Lower the minimum match to {closest / 5 * 5}% to review them.", "profile"));
+
+        // "India" searches the whole country; naming cities gives more relevant results per search.
+        if (preference.Locations.Count > 0 && preference.Locations.All(CountryCodes.IsCountry))
+            hints.Add(new($"Your location is only \"{string.Join(", ", preference.Locations)}\". Add the cities you want (e.g. Chennai, Hyderabad) for closer matches.", "profile"));
 
         if (preference.Locations.Count > 0 && !preference.IncludeRemote)
             hints.Add(new("Turn on \"Include remote jobs\" to also see remote roles open to your country.", "profile"));

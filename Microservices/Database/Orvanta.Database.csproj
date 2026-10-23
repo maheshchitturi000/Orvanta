@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.Build.NoTargets/3.7.56">
+
+  <!--
+    Shows the Orvanta database scripts (Schemas, Tables, Functions, StoredProcedures, Migrations) in
+    Solution Explorer. Nothing is compiled; deploy with Deploy-Database.ps1 (see README.md).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="**\*.sql;*.ps1;*.md" Exclude="bin\**;obj\**" />
+  </ItemGroup>
+
+</Project>

@@ -20,6 +20,18 @@
   }
 }
 
+.label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.forgot {
+  font-size: 13px;
+  font-weight: 600;
+}
+
 a.btn:hover {
   text-decoration: none;
 }

@@ -1,0 +1,370 @@
+.page {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 28px 28px 64px;
+}
+
+.greeting {
+  font-size: 22px;
+}
+
+/* ---------- Totals ---------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 14px;
+  align-items: center;
+  padding: 18px;
+  color: inherit;
+  font-weight: 400;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+
+  &:is(a):hover {
+    border-color: var(--lavender-300);
+    box-shadow: var(--shadow);
+    transform: translateY(-1px);
+    text-decoration: none;
+  }
+}
+
+.stat-icon {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--lavender-100);
+  color: var(--lavender-700);
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text);
+
+  small {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-subtle);
+  }
+}
+
+.stat-label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.alert {
+  align-items: center;
+}
+
+/* ---------- Charts ---------- */
+
+.charts {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.chart {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+}
+
+.chart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+
+  h3 {
+    font-size: 15.5px;
+  }
+}
+
+.chart-sub {
+  font-size: 12.5px;
+  color: var(--text-subtle);
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-subtle);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--lavender-50);
+    color: var(--lavender-700);
+  }
+}
+
+.spinning {
+  animation: orv-spin 0.8s linear infinite;
+}
+
+/* Column chart: 1px recessive grid, ≤24px bars with a 4px rounded top, square at the baseline. */
+.columns-plot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  height: 220px;
+
+  &.loading .plot {
+    opacity: 0.5;
+  }
+}
+
+.y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-bottom: 22px; // room for the x labels
+  font-size: 11px;
+  color: var(--text-subtle);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+
+  span {
+    transform: translateY(-50%);
+  }
+
+  span:last-child {
+    transform: translateY(50%);
+  }
+}
+
+.plot {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding-bottom: 22px;
+  transition: opacity 0.2s ease;
+}
+
+.grid {
+  position: absolute;
+  inset: 0 0 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+
+  span {
+    height: 1px;
+    background: var(--chart-grid);
+  }
+
+  span:last-child {
+    background: var(--border-strong); // baseline
+  }
+}
+
+.slot {
+  position: relative;
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  min-width: 0;
+  outline: none;
+  cursor: default;
+
+  // Hover wash over the whole slot: the hit target is bigger than the bar.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 0;
+    border-radius: 6px;
+    background: transparent;
+    transition: background 0.15s ease;
+  }
+
+  &.active::before,
+  &:focus-visible::before {
+    background: var(--lavender-50);
+  }
+}
+
+.bar {
+  position: relative;
+  width: min(24px, 70%);
+  max-height: 100%;
+  border-radius: 4px 4px 0 0;
+  background: var(--chart-mark);
+  transition: height 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.x-label {
+  position: absolute;
+  bottom: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--text-subtle);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+
+  &.today {
+    color: var(--text);
+    font-weight: 600;
+  }
+}
+
+.tooltip {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  z-index: 5;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 3px;
+  min-width: 150px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  font-size: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
+  animation: tt-in 0.12s ease-out;
+
+  &.align-start {
+    left: 0;
+    transform: none;
+  }
+
+  &.align-end {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+
+  strong {
+    color: var(--text);
+    font-size: 12.5px;
+  }
+}
+
+@keyframes tt-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+
+.tt-total {
+  margin-bottom: 2px;
+  color: var(--text);
+}
+
+.tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tt-failed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  color: var(--danger);
+}
+
+/* Horizontal bars: label · track · value at the tip. */
+.bars {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+}
+
+.bar-label {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  height: 12px;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: var(--chart-mark);
+  transition: width 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.bar-value {
+  min-width: 24px;
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  font-size: 13.5px;
+  color: var(--text-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar,
+  .bar-fill,
+  .tooltip {
+    transition: none;
+    animation: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 20px 16px 48px;
+  }
+
+  .stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

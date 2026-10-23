@@ -30,16 +30,22 @@ export class Login implements OnInit {
 
   ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;
-    if (params.get('verified')) {
+    if (params.get('reset')) {
+      this.infoMessage.set('Your password has been updated. Sign in with your new password.');
+    } else if (params.get('verified')) {
       this.infoMessage.set('Email verified! Sign in to get started.');
-    } else if (params.get('reason') === 'expired') {
-      this.infoMessage.set('Your session expired. Please sign in again.');
     }
 
     const email = params.get('email');
     if (email) {
       this.form.controls.email.setValue(email);
     }
+  }
+
+  /** Carries the email already typed over to the reset page. */
+  forgotParams(): Record<string, string> {
+    const email = this.form.controls.email.value.trim();
+    return email ? { email } : {};
   }
 
   showError(name: 'email' | 'password'): boolean {

@@ -100,7 +100,19 @@ async function startRun() {
   const items = await readyApplications();
   if (!items.length) return { started: false, message: 'Nothing is ready to submit yet.' };
 
-  const run = { queue: items.map(a => a.id), byId: Object.fromEntries(items.map(a => [a.id, a])), index: 0, tabId: null, done: 0 };
+  const previous = await getRun();
+  const run = {
+    queue: items.map(a => a.id),
+    byId: Object.fromEntries(items.map(a => [a.id, a])),
+    index: 0,
+    tabId: previous?.tabId ?? null, // restarting reuses the same tab
+    done: 0,
+    hops: {}, // "Apply" links followed per application (description page → form)
+    accountStep: {}, // applications that hit a sign-in / sign-up / OTP step
+    reopens: {}, // times the job page was reopened after signing in
+    attention: null, // what the user must do on the current job ("Action required")
+    blockedHost: null
+  };
   await setRun(run);
   await openCurrent(run);
   return { started: true, total: items.length };
@@ -161,6 +173,7 @@ async function advance(markSubmitted, automatic = false) {
     if (automatic) await countAutoSubmission();
   }
   run.index++;
+  run.attention = null;
   await setRun(run);
   await chrome.action.setBadgeText({ text: '' });
 
@@ -190,19 +203,57 @@ async function taskForTab(tabId) {
   return app ? { application: app, position: run.index + 1, total: run.queue.length } : null;
 }
 
-// Jobs from LinkedIn/Naukri/Indeed can redirect to any company site. When the user granted the
+// Jobs from LinkedIn/Indeed/Glassdoor can redirect to any company site. When the user granted the
 // optional "all https sites" permission, inject the filler into the run tab wherever it lands.
 chrome.tabs.onUpdated.addListener(async (tabId, change, tab) => {
   if (change.status !== 'complete' || !/^https:/.test(tab.url || '')) return;
   const run = await getRun();
   if (!run || run.tabId !== tabId) return;
+  await injectFiller(tabId, tab.url, run);
+});
+
+/** Puts the form filler into the run tab. Without access to the site, flags it so the popup can ask. */
+async function injectFiller(tabId, url, run) {
   try {
     await chrome.scripting.insertCSS({ target: { tabId }, files: ['content.css'] });
     await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+    if (run.blockedHost) {
+      run.blockedHost = null;
+      await setRun(run);
+      await chrome.action.setBadgeText({ text: '' });
+    }
   } catch {
-    // No permission for this site: the user can still fill it manually and press "I submitted it".
+    run.blockedHost = new URL(url).hostname;
+    await setRun(run);
+    await chrome.action.setBadgeBackgroundColor({ color: '#d93a4a' });
+    await chrome.action.setBadgeText({ text: '!' });
+    await chrome.action.setTitle({ title: `Orvanta isn't allowed on ${run.blockedHost}. Click to allow.` });
   }
+}
+
+// "Apply" on a job page often opens the real form in a new tab (LinkedIn → company site, Glassdoor…):
+// the run follows it there.
+chrome.tabs.onCreated.addListener(async tab => {
+  const run = await getRun();
+  if (!run || !run.tabId || tab.openerTabId !== run.tabId) return;
+  run.tabId = tab.id;
+  await setRun(run);
 });
+
+// ---------- Bridge to the Orvanta web app ----------
+
+const ORVANTA_APP_TABS = 'http://localhost:4200/*';
+
+// Chrome only adds manifest content scripts to pages loaded after the extension is enabled. When the
+// user turns the extension on while Orvanta is already open (e.g. from the "enable the extension" dialog),
+// add the bridge to those tabs so the app notices right away. bridge.js ignores a second injection.
+async function injectBridgeIntoOpenTabs() {
+  const tabs = await chrome.tabs.query({ url: ORVANTA_APP_TABS });
+  await Promise.all(tabs.map(tab =>
+    chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['bridge.js'] }).catch(() => {})));
+}
+
+injectBridgeIntoOpenTabs();
 
 // ---------- Messages from popup and content script ----------
 
@@ -214,13 +265,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         try {
           const ready = await readyApplications();
           const auto = await autoSettings();
-          return { signedIn: true, ready: ready.length, running: !!run, position: run ? run.index + 1 : 0, total: run?.queue.length ?? 0, auto };
+          return { signedIn: true, ready: ready.length, running: !!run, position: run ? run.index + 1 : 0, total: run?.queue.length ?? 0, auto, blockedHost: run?.blockedHost ?? null, attention: run?.attention ?? null };
         } catch (e) {
           return { signedIn: false, error: e.message };
         }
       }
       case 'start':
         return await startRun();
+      case 'start-from-app': {
+        // "Apply" in the Orvanta web app. The user chose the mode there (auto-submit needs their explicit
+        // acknowledgement on that screen), so store it like the Options page would.
+        await chrome.storage.sync.set(message.autoSubmit
+          ? { autoSubmit: true, autoSubmitAcknowledged: true }
+          : { autoSubmit: false });
+        // Access to all https sites can only be granted from a click inside the extension: ask on a small page.
+        if (!(await chrome.permissions.contains({ origins: ['https://*/*'] }))) {
+          await chrome.tabs.create({ url: chrome.runtime.getURL('start.html'), active: true });
+          return { started: false, needsPermission: true };
+        }
+        return await startRun();
+      }
+      case 'retry-blocked': {
+        // Popup: the user just granted access; put the filler into the run tab now.
+        const run = await getRun();
+        if (!run?.tabId) return { error: 'Nothing is running.' };
+        const tab = await chrome.tabs.get(run.tabId);
+        await chrome.action.setTitle({ title: 'Orvanta' });
+        await injectFiller(run.tabId, tab.url, run);
+        await chrome.tabs.update(run.tabId, { active: true });
+        return { ok: !run.blockedHost };
+      }
+      case 'follow-apply': {
+        // Content script found a job description with an "Apply" button: allow a few hops per job.
+        const run = await getRun();
+        const id = run?.queue[run.index];
+        if (!id) return { allowed: false };
+        run.hops ??= {};
+        run.hops[id] = (run.hops[id] ?? 0) + 1;
+        await setRun(run);
+        return { allowed: run.hops[id] <= 3 };
+      }
       case 'stop':
         await chrome.alarms.clear(NEXT_JOB_ALARM);
         await setRun(null);
@@ -230,16 +314,62 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return await taskForTab(sender.tab?.id);
       case 'cv':
         return await cvAsDataUrl();
-      case 'submitted':
+      case 'submitted': {
+        // A late confirmation from a job already handled must not mark the next job as submitted.
+        const run = await getRun();
+        if (message.applicationId && run?.queue[run.index] !== message.applicationId) return { ok: false, stale: true };
         await advance(true, !!message.automatic);
         return { ok: true };
+      }
       case 'settings':
         return await autoSettings();
-      case 'needs-user':
-        // Auto mode paused on this job: flag it so the user notices.
+      case 'needs-user': {
+        // The agent handed a step to the user (code, sign-in, CAPTCHA, a question): flag it so they notice.
+        const run = await getRun();
+        if (run) {
+          run.attention = String(message.text || 'Orvanta needs you on this job.').slice(0, 300);
+          await setRun(run);
+        }
         await chrome.action.setBadgeBackgroundColor({ color: '#d93a4a' });
         await chrome.action.setBadgeText({ text: '!' });
+        await chrome.action.setTitle({ title: 'Orvanta: action required' });
         return { ok: true };
+      }
+      case 'resumed': {
+        const run = await getRun();
+        if (run?.attention) {
+          run.attention = null;
+          await setRun(run);
+        }
+        await chrome.action.setBadgeText({ text: '' });
+        await chrome.action.setTitle({ title: 'Orvanta' });
+        return { ok: true };
+      }
+      case 'account-step': {
+        // Remember that this job went through a sign-in: afterwards the site may land on its dashboard.
+        const run = await getRun();
+        const id = run?.queue[run.index];
+        if (id && sender.tab?.id === run.tabId && !run.accountStep?.[id]) {
+          run.accountStep = { ...run.accountStep, [id]: true };
+          await setRun(run);
+        }
+        return { ok: true };
+      }
+      case 'reopen-job': {
+        // Back to the job page: automatically (at most twice) after a sign-in, or when the user asks.
+        const run = await getRun();
+        const id = run?.queue[run.index];
+        if (!id || !run.tabId) return { reopened: false };
+        const reopens = run.reopens?.[id] ?? 0;
+        if (!message.force && (!run.accountStep?.[id] || reopens >= 2)) return { reopened: false };
+        run.reopens = { ...run.reopens, [id]: reopens + 1 };
+        run.hops = { ...run.hops, [id]: 0 }; // "Apply" may be needed again from the job page
+        run.attention = null;
+        await setRun(run);
+        await chrome.action.setBadgeText({ text: '' });
+        await chrome.tabs.update(run.tabId, { url: run.byId[id].job.applyUrl, active: true });
+        return { reopened: true };
+      }
       case 'skip':
         await advance(false);
         return { ok: true };

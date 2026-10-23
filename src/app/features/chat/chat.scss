@@ -50,8 +50,8 @@
   width: 56px;
   height: 56px;
   border-radius: 18px;
-  background: linear-gradient(135deg, var(--lavender-500), var(--lavender-700));
-  color: var(--white);
+  background: var(--accent-gradient);
+  color: var(--on-accent);
   box-shadow: 0 12px 28px rgba(124, 92, 255, 0.3);
 }
 
@@ -71,7 +71,7 @@
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--white);
+  background: var(--surface);
   color: var(--text);
   font: inherit;
   font-size: 14px;
@@ -110,7 +110,7 @@
 
     .bubble {
       background: var(--lavender-600);
-      color: var(--white);
+      color: var(--on-accent);
       border-color: transparent;
       border-top-left-radius: var(--radius-lg);
       border-top-right-radius: 6px;
@@ -132,8 +132,8 @@
 
   &.bot {
     border-radius: 10px;
-    background: linear-gradient(135deg, var(--lavender-500), var(--lavender-700));
-    color: var(--white);
+    background: var(--accent-gradient);
+    color: var(--on-accent);
   }
 }
 
@@ -144,7 +144,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   border-top-left-radius: 6px;
-  background: var(--white);
+  background: var(--surface);
   box-shadow: var(--shadow-sm);
 
   p {
@@ -217,7 +217,7 @@
   padding: 10px 10px 10px 16px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
-  background: var(--white);
+  background: var(--surface);
   box-shadow: var(--shadow);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
@@ -251,13 +251,13 @@
   height: 40px;
   border: 0;
   border-radius: 12px;
-  background: var(--lavender-600);
-  color: var(--white);
+  background: var(--accent);
+  color: var(--on-accent);
   cursor: pointer;
   transition: background 0.15s ease;
 
   &:hover:not(:disabled) {
-    background: var(--lavender-700);
+    background: var(--accent-hover);
   }
 
   &:disabled {

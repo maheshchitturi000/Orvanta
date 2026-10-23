@@ -16,8 +16,8 @@ public static class JobsCoreServiceCollectionExtensions
     {
         services.Configure<JobsOptions>(configuration.GetSection(JobsOptions.SectionName));
 
-        var connectionString = configuration.GetConnectionString("JobsDb") ?? configuration["JobsDb"]
-            ?? throw new InvalidOperationException("Connection string 'JobsDb' is not configured.");
+        var connectionString = configuration.GetConnectionString("Orvanta")
+            ?? throw new InvalidOperationException("Connection string 'Orvanta' is not configured.");
         services.AddDbContext<JobsDbContext>(o => o.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure(3)));
 
         services.AddMemoryCache();
@@ -32,6 +32,7 @@ public static class JobsCoreServiceCollectionExtensions
         services.AddSingleton<IJobSource, AshbySource>();
         services.AddSingleton<JobSourceRegistry>();
         services.AddSingleton<IJobSearchSource, JSearchSource>();
+        services.AddSingleton<IJobSearchSource, AdzunaSource>();
         services.AddScoped<JobSourceCredentials>();
 
         services.AddHttpClient<ILlmClient, OllamaLlmClient>(c => c.Timeout = Timeout.InfiniteTimeSpan);

@@ -4,12 +4,14 @@ using Microsoft.Extensions.Options;
 using Orvanta.AuthService.Contracts;
 using Orvanta.AuthService.Security;
 using Orvanta.AuthService.Services;
+using Orvanta.Shared.Auditing;
 using Orvanta.Shared.Responses;
 using Orvanta.Shared.Security;
 
 namespace Orvanta.AuthService.Controllers;
 
 [Route("api/auth")]
+[SkipAudit] // AuthService writes its own audit events (sign-in, reset, sign-out...) with the user they concern.
 public sealed class AuthController(IAuthService authService, IOptions<AuthSecurityOptions> securityOptions) : ApiControllerBase
 {
     private const string RefreshCookiePath = "/api/auth";
@@ -29,6 +31,24 @@ public sealed class AuthController(IAuthService authService, IOptions<AuthSecuri
     [AllowAnonymous]
     public async Task<ActionResult<ResponseCls<OtpSentResult>>> ResendOtp(ResendOtpRequest request, CancellationToken ct) =>
         Respond(await authService.ResendOtpAsync(request, ct));
+
+    /// <summary>Step 1 of "forgot password": emails a reset code. Same answer whether or not the account exists.</summary>
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ResponseCls<OtpSentResult>>> ForgotPassword(ForgotPasswordRequest request, CancellationToken ct) =>
+        Respond(await authService.ForgotPasswordAsync(request, ct));
+
+    /// <summary>Step 2: checks the code (without using it up) before the user picks a new password.</summary>
+    [HttpPost("verify-reset-code")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ResponseCls<object>>> VerifyResetCode(VerifyResetCodeRequest request, CancellationToken ct) =>
+        Respond(await authService.VerifyResetCodeAsync(request, ct));
+
+    /// <summary>Step 3: sets the new password, uses up the code and signs the account out everywhere.</summary>
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ResponseCls<object>>> ResetPassword(ResetPasswordRequest request, CancellationToken ct) =>
+        Respond(await authService.ResetPasswordAsync(request, ct));
 
     [HttpPost("login")]
     [AllowAnonymous]

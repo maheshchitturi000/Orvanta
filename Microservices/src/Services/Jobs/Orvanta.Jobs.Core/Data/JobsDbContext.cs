@@ -15,20 +15,6 @@ public sealed class JobsDbContext(DbContextOptions<JobsDbContext> options) : DbC
     public DbSet<JobApplication> Applications => Set<JobApplication>();
     public DbSet<JobSourceConnection> SourceConnections => Set<JobSourceConnection>();
 
-    /// <summary>
-    /// Idempotent schema additions for databases created by an earlier EnsureCreated (development).
-    /// New databases get these from the model. Production should use EF Core migrations.
-    /// </summary>
-    public const string DevelopmentSchemaPatches = """
-        IF OBJECT_ID(N'dbo.JobSourceConnections', N'U') IS NULL
-        CREATE TABLE dbo.JobSourceConnections (
-            UserId uniqueidentifier NOT NULL,
-            Source nvarchar(30) NOT NULL,
-            SecretEncrypted nvarchar(1000) NOT NULL,
-            ConnectedAtUtc datetime2 NOT NULL,
-            CONSTRAINT PK_JobSourceConnections PRIMARY KEY (UserId, Source));
-        """;
-
     /// <summary>All timestamps are stored as UTC; read them back as UTC so APIs serialize them with "Z".</summary>
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

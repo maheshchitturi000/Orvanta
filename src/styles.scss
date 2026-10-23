@@ -1,11 +1,31 @@
 /* ==========================================================================
-   Orvanta AI design system: white + lavender
+   Orvanta AI design system: white + lavender, with a dark theme
    Tokens live here; components use the shared classes below and keep their
-   own stylesheets for layout only.
+   own stylesheets for layout only. Components use semantic tokens (surface,
+   text, accent…), never raw colors, so both themes work everywhere.
+   Theme: <html data-theme="light|dark">, set by ThemeService (and by the
+   inline script in index.html before Angular starts, to avoid a flash).
    ========================================================================== */
 
 :root {
-  --white: #ffffff;
+  color-scheme: light;
+
+  /* Surfaces */
+  --surface: #ffffff;
+  --on-accent: #ffffff;
+  --neutral-bg: #f3f2f7;
+  --overlay: rgba(42, 27, 102, 0.28);
+  --topbar-bg: rgba(255, 255, 255, 0.86);
+
+  /* Brand accent (buttons, brand mark): identical in both themes */
+  --accent: #7c5cff;
+  --accent-hover: #6343e0;
+  --accent-gradient: linear-gradient(135deg, #8b6cff, #6343e0);
+
+  /* Charts (validated with the dataviz palette checks against each theme's surface) */
+  --chart-mark: #7c5cff;
+  --chart-grid: #ece8f8;
+
   --lavender-25: #fcfbff;
   --lavender-50: #f7f5ff;
   --lavender-100: #efebff;
@@ -26,10 +46,16 @@
 
   --success: #12a150;
   --success-bg: #ecfbf2;
+  --success-border: #c8f0d8;
+  --success-text: #0c6b37;
   --danger: #d93a4a;
   --danger-bg: #fff1f2;
+  --danger-border: #ffd9de;
+  --danger-text: #9f1d2b;
   --warning: #b7791f;
   --warning-bg: #fff8eb;
+  --warning-border: #fde7bf;
+  --warning-text: #7a5212;
 
   --radius-sm: 10px;
   --radius: 14px;
@@ -42,6 +68,111 @@
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
+/* Dark: the lavender scale is inverted (25 = darkest tint, 900 = lightest text) so every
+   "tinted background + strong lavender text" pair keeps its contrast without per-component rules. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --surface: #17141f;
+  --neutral-bg: #221f2e;
+  --chart-mark: #8b6cff;
+  --chart-grid: #2a2540;
+  --overlay: rgba(4, 3, 10, 0.6);
+  --topbar-bg: rgba(23, 20, 31, 0.86);
+
+  --lavender-25: #12101a;
+  --lavender-50: #1b1828;
+  --lavender-100: #262138;
+  --lavender-200: #342c4f;
+  --lavender-300: #4a3f72;
+  --lavender-400: #7a66d6;
+  --lavender-500: #9a80ff;
+  --lavender-600: #a48dff;
+  --lavender-700: #bcaeff;
+  --lavender-800: #d3c9ff;
+  --lavender-900: #ebe6ff;
+
+  --text: #ece9f7;
+  --text-muted: #aaa4c4;
+  --text-subtle: #7d7799;
+  --border: #2a2540;
+  --border-strong: #3b3457;
+
+  --success: #3ccf7e;
+  --success-bg: rgba(60, 207, 126, 0.12);
+  --success-border: rgba(60, 207, 126, 0.3);
+  --success-text: #7be3a8;
+  --danger: #ff6b7a;
+  --danger-bg: rgba(255, 107, 122, 0.12);
+  --danger-border: rgba(255, 107, 122, 0.3);
+  --danger-text: #ff9aa5;
+  --warning: #f0b45c;
+  --warning-bg: rgba(240, 180, 92, 0.12);
+  --warning-border: rgba(240, 180, 92, 0.3);
+  --warning-text: #f5c987;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --focus-ring: 0 0 0 4px rgba(164, 141, 255, 0.28);
+}
+
+/* ---------- Motion ----------
+   Page changes (router view transitions): only the content area animates; sidebar and top bar stay put.
+   Theme changes (ThemeService): the whole screen cross-fades; html.theme-switching turns the content
+   area's own animation off so everything fades together. */
+
+app-shell main.content {
+  view-transition-name: page;
+}
+
+html.theme-switching app-shell main.content {
+  view-transition-name: none;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.35s;
+  animation-timing-function: ease;
+}
+
+::view-transition-old(page) {
+  animation: orv-fade-out 0.14s ease both;
+}
+
+::view-transition-new(page) {
+  animation: orv-fade-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes orv-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes orv-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* Browsers without view transitions: colors ease instead (class set by ThemeService). */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease !important;
+}
+
 *,
 *::before,
 *::after {
@@ -52,7 +183,7 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  background: var(--white);
+  background: var(--surface);
   color: var(--text);
   font-family: var(--font);
   font-size: 15px;
@@ -127,17 +258,17 @@ button {
 }
 
 .btn-primary {
-  background: var(--lavender-600);
-  color: var(--white);
+  background: var(--accent);
+  color: var(--on-accent);
   box-shadow: 0 6px 16px rgba(124, 92, 255, 0.28);
 
   &:hover:not(:disabled) {
-    background: var(--lavender-700);
+    background: var(--accent-hover);
   }
 }
 
 .btn-outline {
-  background: var(--white);
+  background: var(--surface);
   color: var(--lavender-700);
   border-color: var(--lavender-200);
 
@@ -191,7 +322,7 @@ button {
   padding: 0 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
-  background: var(--white);
+  background: var(--surface);
   color: var(--text);
   font: inherit;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -212,7 +343,7 @@ button {
 
   &.invalid {
     border-color: var(--danger);
-    background: #fffafb;
+    background: color-mix(in srgb, var(--danger) 4%, var(--surface));
   }
 }
 
@@ -291,7 +422,7 @@ button {
 /* ---------- Surfaces ---------- */
 
 .card {
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
@@ -315,7 +446,7 @@ button {
   }
 
   &.muted {
-    background: #f3f2f7;
+    background: var(--neutral-bg);
     color: var(--text-muted);
   }
 
@@ -337,14 +468,14 @@ button {
 
   &.error {
     background: var(--danger-bg);
-    border-color: #ffd9de;
-    color: #9f1d2b;
+    border-color: var(--danger-border);
+    color: var(--danger-text);
   }
 
   &.success {
     background: var(--success-bg);
-    border-color: #c8f0d8;
-    color: #0c6b37;
+    border-color: var(--success-border);
+    color: var(--success-text);
   }
 
   &.info {
@@ -355,8 +486,8 @@ button {
 
   &.warning {
     background: var(--warning-bg);
-    border-color: #fde7bf;
-    color: #7a5212;
+    border-color: var(--warning-border);
+    color: var(--warning-text);
   }
 }
 
@@ -382,8 +513,8 @@ button {
   width: 36px;
   height: 36px;
   border-radius: 11px;
-  background: linear-gradient(135deg, var(--lavender-500), var(--lavender-700));
-  color: var(--white);
+  background: var(--accent-gradient);
+  color: var(--on-accent);
   font-weight: 700;
   font-size: 17px;
   box-shadow: 0 6px 14px rgba(124, 92, 255, 0.3);

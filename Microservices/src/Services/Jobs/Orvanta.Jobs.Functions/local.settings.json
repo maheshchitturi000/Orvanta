@@ -15,6 +15,6 @@
     "Jobs__Llm__TimeoutSeconds": "120"
   },
   "ConnectionStrings": {
-    "JobsDb": "Server=localhost\\SQLEXPRESS;Database=OrvantaJobs;Trusted_Connection=True;TrustServerCertificate=True"
+    "Orvanta": "Server=localhost\\SQLEXPRESS;Database=Orvanta;Trusted_Connection=True;TrustServerCertificate=True"
   }
 }

@@ -17,7 +17,10 @@
     </div>
 
     <div class="field">
-      <label for="password">Password</label>
+      <div class="label-row">
+        <label for="password">Password</label>
+        <a class="forgot" routerLink="/forgot-password" [queryParams]="forgotParams()">Forgot password?</a>
+      </div>
       <div class="input-group">
         <input id="password" class="input" [type]="showPassword() ? 'text' : 'password'"
                formControlName="password" autocomplete="current-password" placeholder="Your password"

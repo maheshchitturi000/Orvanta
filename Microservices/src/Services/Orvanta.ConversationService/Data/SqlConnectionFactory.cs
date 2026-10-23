@@ -11,9 +11,9 @@ public sealed class SqlConnectionFactory : IDbConnectionFactory
     public SqlConnectionFactory(IConfiguration configuration)
     {
         _connectionString =
-            configuration.GetConnectionString("OrvantaDb")
+            configuration.GetConnectionString("Orvanta")
             ?? throw new InvalidOperationException(
-                "Connection string 'OrvantaDb' is missing.");
+                "Connection string 'Orvanta' is missing.");
     }
 
     public IDbConnection CreateConnection()
